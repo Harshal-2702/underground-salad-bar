@@ -1,0 +1,17 @@
+node_modules/
+dist/
+.env
+.env.local
+
+usb-api/node_modules/
+usb-api/.env
+
+usb-admin/node_modules/
+
+.vscode/
+
+*.log
+
+coverage/
+
+.prisma/
