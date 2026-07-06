@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { X, Trash2, Plus, ArrowRight, CheckCircle2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Bowl } from './BowlBuilder';
+export const API_URL = "https://usb-api.onrender.com";
 
 interface CartProps {
   isOpen: boolean;
@@ -51,7 +52,7 @@ export function Cart({ isOpen, onClose, bowls, onRemoveBowl, onBuildAnother }: C
   }
 
   try {
-    const response = await fetch("http://localhost:5000/orders", {
+    const response = await fetch(`${API_URL}/orders`, {
       method: "POST",
 
       headers: {
