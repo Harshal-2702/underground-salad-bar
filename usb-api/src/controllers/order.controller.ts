@@ -63,8 +63,9 @@ catch (err: any) {
   console.error("CREATE ORDER ERROR:", err);
 
   res.status(500).json({
-    error: err?.message || "Failed to create order",
-    details: err,
+    message: err?.message,
+    code: err?.code,
+    meta: err?.meta,
   });
 }
   
