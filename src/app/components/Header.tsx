@@ -63,7 +63,7 @@ export function Header({ currentPage, onNavigate, cartItemCount, onCartClick }: 
           <div className="flex items-center gap-3">
             {/* Zomato */}
             <a
-              href="https://zomato.com"
+              href="https://zomato.onelink.me/xqzv/5slyil4s"
               target="_blank"
               rel="noopener noreferrer"
               title="Order on Zomato"
@@ -148,7 +148,7 @@ export function Header({ currentPage, onNavigate, cartItemCount, onCartClick }: 
               </button>
               {/* Social links mobile */}
               <div className="flex gap-3 px-4 py-2">
-                <a href="https://zomato.com" target="_blank" rel="noopener noreferrer"
+                <a href="https://zomato.onelink.me/xqzv/5slyil4s" target="_blank" rel="noopener noreferrer"
                   className="flex items-center gap-1.5 px-4 py-2 bg-[#CB202D] text-white rounded-full font-['Sora'] text-xs font-bold">
                   🍽 Zomato
                 </a>

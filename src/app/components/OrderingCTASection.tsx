@@ -52,7 +52,7 @@ export function OrderingCTASection({ onBuildBowlClick }: OrderingCTASectionProps
 
           {/* Social order buttons */}
           <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
-            <a href="https://zomato.com" target="_blank" rel="noopener noreferrer"
+            <a href="https://zomato.onelink.me/xqzv/5slyil4s" target="_blank" rel="noopener noreferrer"
               className="flex items-center gap-2.5 px-6 py-3.5 bg-[#CB202D] hover:bg-[#b01c27] text-white rounded-full font-['Sora'] font-semibold text-sm tracking-wide transition-all shadow-md">
               <span>🍽</span> Order on Zomato
             </a>

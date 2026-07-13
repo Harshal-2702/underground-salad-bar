@@ -48,7 +48,7 @@ export function Footer() {
 
             {/* Prominent social buttons */}
             <div className="flex flex-col gap-2.5 mt-5">
-              <a href="https://zomato.com" target="_blank" rel="noopener noreferrer"
+              <a href="https://zomato.onelink.me/xqzv/5slyil4s" target="_blank" rel="noopener noreferrer"
                 className="flex items-center gap-3 px-4 py-3 bg-[#CB202D] hover:bg-[#b01c27] text-white rounded-xl font-['Sora'] text-sm font-semibold transition-colors">
                 <span className="text-lg">🍽</span>
                 <span>Order on Zomato</span>
