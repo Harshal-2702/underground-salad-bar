@@ -52,13 +52,14 @@ export async function createOrder(req: Request, res: Response) {
             },
           },
         },
-
         bowls: {
-          create: bowls.map((b: any) => ({
-            bowlName: b.name,
-            quantity: Number(b.quantity),
-            price: Number(b.price),
-          })),
+create: bowls.map((b: any) => ({
+  bowlName: b.name,
+  quantity: b.quantity,
+  price: b.price,
+  details: b.details,
+})),
+        
         },
       },
 

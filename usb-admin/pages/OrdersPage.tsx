@@ -341,10 +341,34 @@ minute:"2-digit"
           <hr />
 
           {order.bowls.map((bowl: any) => (
-            <div key={bowl.id}>
-              {bowl.quantity} × {bowl.bowlName}
-            </div>
-          ))}
+  <div
+    key={bowl.id}
+    style={{
+      marginTop: 8,
+      padding: 8,
+      borderRadius: 8,
+      background: "#f8f8f8",
+    }}
+  >
+    <div style={{ fontWeight: 600 }}>
+      {bowl.quantity} × {bowl.bowlName}
+    </div>
+
+    {bowl.details && (
+      <pre
+        style={{
+          whiteSpace: "pre-wrap",
+          marginTop: 8,
+          fontSize: 13,
+          color: "#444",
+          fontFamily: "inherit",
+        }}
+      >
+        {bowl.details}
+      </pre>
+    )}
+  </div>
+))}
         </div>
       ))}
 

@@ -42,6 +42,8 @@ model OrderBowl {
   quantity Int
   price    Float
 
+  details  String? @db.Text
+
   orderId String
   order   Order @relation(fields: [orderId], references: [id])
 }
