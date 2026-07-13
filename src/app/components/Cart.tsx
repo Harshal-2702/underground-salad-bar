@@ -59,45 +59,36 @@ export function Cart({ isOpen, onClose, bowls, onRemoveBowl, onBuildAnother }: C
         "Content-Type": "application/json",
       },
 
-      body: JSON.stringify({
-        customerName: form.name,
-        phone: form.phone,
-        address: form.address,
-        area: form.area,
-        city: form.city,
+body: JSON.stringify({
+  customerName: form.name,
+  phone: form.phone,
+  address: form.address,
+  area: form.area,
+  city: form.city,
+  total: grandTotal,
 
-        total: grandTotal,
+  bowls: bowls.map((bowl) => ({
+    name: "Build Your Own Bowl",
+    quantity: 1,
+    price: bowl.total,
 
-        bowls: bowls.map((bowl) => ({
-  name: "Build Your Own Bowl",
-  quantity: 1,
-  price: bowl.total,
+    details: bowl.items
+      .map((item) => {
+        let text = `${item.category.toUpperCase()}: ${item.name}`;
 
+        if (item.scoops > 1) {
+          text += ` x${item.scoops}`;
+        }
 
-bowls: bowls.map((bowl) => ({
-  name: "Build Your Own Bowl",
-  quantity: 1,
-  price: bowl.total,
+        if (item.veggieSelection?.length) {
+          text += ` (${item.veggieSelection.join(", ")})`;
+        }
 
-  details: bowl.items
-    .map((item) => {
-      let text = `${item.category.toUpperCase()}: ${item.name}`;
-
-      if (item.scoops > 1) {
-        text += ` x${item.scoops}`;
-      }
-
-      if (item.veggieSelection && item.veggieSelection.length > 0) {
-        text += ` (${item.veggieSelection.join(", ")})`;
-      }
-
-      return text;
-    })
-    .join("\n"),
-})),
-
-})),
-      }),
+        return text;
+      })
+      .join("\n"),
+  })),
+})
     });
 
     if (!response.ok) {
