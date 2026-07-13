@@ -26,7 +26,7 @@ const { bowls } = req.body;
     paymentMethod: "COD",
     status: "PENDING",
 
-    customer: {
+ customer: {
   connectOrCreate: {
     where: {
       phone,
