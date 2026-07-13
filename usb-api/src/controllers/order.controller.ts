@@ -27,14 +27,20 @@ const { bowls } = req.body;
     status: "PENDING",
 
     customer: {
-  create: {
-    name: customerName,
-    phone,
-    address,
-    area,
-    city,
+  connectOrCreate: {
+    where: {
+      phone,
+    },
+    create: {
+      name: customerName,
+      phone,
+      address,
+      area,
+      city,
+    },
   },
 },
+
     
 
     bowls: {
