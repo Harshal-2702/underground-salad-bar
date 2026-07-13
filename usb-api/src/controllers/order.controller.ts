@@ -8,15 +8,18 @@ export async function createOrder(req: Request, res: Response) {
     console.log("===== NEW ORDER =====");
     console.log(JSON.stringify(req.body, null, 2));
 
-    const {
-      customerName,
-      phone,
-      address,
-      area,
-      city,
-      total,
-      bowls,
-    } = req.body;
+const {
+  customerName,
+  phone,
+  address,
+  area,
+  city,
+  total,
+  bowls,
+} = req.body;
+
+console.log("REQUEST BODY:");
+console.log(JSON.stringify(req.body, null, 2));
 
     if (!customerName || !phone || !address || !area || !city) {
       return res.status(400).json({
@@ -31,6 +34,8 @@ export async function createOrder(req: Request, res: Response) {
     }
 
     const invoiceNumber = `USB-${Date.now()}`;
+
+    
 
     const order = await prisma.order.create({
       data: {
