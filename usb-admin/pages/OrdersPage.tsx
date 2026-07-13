@@ -9,7 +9,7 @@ export default function OrdersPage() {
   const [orders, setOrders] = useState<any[]>([]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
-  const [dateFilter, setDateFilter] = useState("TODAY");
+  const dateFilter = "TODAY";
   const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
 
   const loadOrders = () => {
@@ -94,9 +94,7 @@ const preparing = filteredOrders.filter(
   o => o.status === "PREPARING"
 ).length;
 
-const ready = filteredOrders.filter(
-  o => o.status === "READY"
-).length;
+
 
   return (
 
