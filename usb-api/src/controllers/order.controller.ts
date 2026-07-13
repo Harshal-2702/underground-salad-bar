@@ -52,14 +52,15 @@ const { bowls } = req.body;
   },
 });
     res.json(order);
-  } catch (err) {
-    console.error(err);
+  } 
+catch (err: any) {
+  console.error("CREATE ORDER ERROR:", err);
 
-    res.status(500).json({
-      error: "Failed to create order",
-    });
-  }
-
+  res.status(500).json({
+    error: err?.message || "Failed to create order",
+    details: err,
+  });
+}
   
 }
 export async function getOrders(
