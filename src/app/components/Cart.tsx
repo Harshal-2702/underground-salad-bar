@@ -74,20 +74,25 @@ export function Cart({ isOpen, onClose, bowls, onRemoveBowl, onBuildAnother }: C
   price: bowl.total,
 
 
-  bowls: bowls.map((bowl) => ({
+bowls: bowls.map((bowl) => ({
   name: "Build Your Own Bowl",
   quantity: 1,
   price: bowl.total,
 
   details: bowl.items
-    .map(
-      (i) =>
-        `${i.name}${i.scoops > 1 ? ` x${i.scoops}` : ""}${
-          i.veggieSelection?.length
-            ? ` (${i.veggieSelection.join(", ")})`
-            : ""
-        }`
-    )
+    .map((item) => {
+      let text = `${item.category.toUpperCase()}: ${item.name}`;
+
+      if (item.scoops > 1) {
+        text += ` x${item.scoops}`;
+      }
+
+      if (item.veggieSelection && item.veggieSelection.length > 0) {
+        text += ` (${item.veggieSelection.join(", ")})`;
+      }
+
+      return text;
+    })
     .join("\n"),
 })),
 
