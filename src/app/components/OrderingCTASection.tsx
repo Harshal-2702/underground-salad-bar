@@ -56,7 +56,7 @@ export function OrderingCTASection({ onBuildBowlClick }: OrderingCTASectionProps
               className="flex items-center gap-2.5 px-6 py-3.5 bg-[#CB202D] hover:bg-[#b01c27] text-white rounded-full font-['Sora'] font-semibold text-sm tracking-wide transition-all shadow-md">
               <span>🍽</span> Order on Zomato
             </a>
-            <a href="https://instagram.com" target="_blank" rel="noopener noreferrer"
+            <a href="https://www.instagram.com/undergroundbowls?igsh=MXY5bDN4OWJkbTVpNw%3D%3D&utm_source=qr" target="_blank" rel="noopener noreferrer"
               className="flex items-center gap-2.5 px-6 py-3.5 rounded-full font-['Sora'] font-semibold text-sm tracking-wide transition-opacity hover:opacity-90 text-white shadow-md"
               style={{ background: 'linear-gradient(135deg, #f9ce34, #ee2a7b, #6228d7)' }}>
               <Instagram className="w-4 h-4" /> Follow us on Instagram

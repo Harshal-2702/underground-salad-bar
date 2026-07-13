@@ -73,7 +73,7 @@ export function Header({ currentPage, onNavigate, cartItemCount, onCartClick }: 
             </a>
             {/* Instagram */}
             <a
-              href="https://instagram.com"
+              href="https://www.instagram.com/undergroundbowls?igsh=MXY5bDN4OWJkbTVpNw%3D%3D&utm_source=qr"
               target="_blank"
               rel="noopener noreferrer"
               title="Follow on Instagram"
@@ -152,7 +152,7 @@ export function Header({ currentPage, onNavigate, cartItemCount, onCartClick }: 
                   className="flex items-center gap-1.5 px-4 py-2 bg-[#CB202D] text-white rounded-full font-['Sora'] text-xs font-bold">
                   🍽 Zomato
                 </a>
-                <a href="https://instagram.com" target="_blank" rel="noopener noreferrer"
+                <a href="https://www.instagram.com/undergroundbowls?igsh=MXY5bDN4OWJkbTVpNw%3D%3D&utm_source=qr" target="_blank" rel="noopener noreferrer"
                   className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-gradient-to-br from-[#f9ce34] via-[#ee2a7b] to-[#6228d7] text-white font-['Sora'] text-xs font-bold">
                   <Instagram className="w-3.5 h-3.5" /> Instagram
                 </a>

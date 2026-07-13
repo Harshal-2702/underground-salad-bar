@@ -53,7 +53,7 @@ export function Footer() {
                 <span className="text-lg">🍽</span>
                 <span>Order on Zomato</span>
               </a>
-              <a href="https://instagram.com" target="_blank" rel="noopener noreferrer"
+              <a href="https://www.instagram.com/undergroundbowls?igsh=MXY5bDN4OWJkbTVpNw%3D%3D&utm_source=qr" target="_blank" rel="noopener noreferrer"
                 className="flex items-center gap-3 px-4 py-3 rounded-xl font-['Sora'] text-sm font-semibold transition-opacity hover:opacity-90 text-white"
                 style={{ background: 'linear-gradient(135deg, #f9ce34, #ee2a7b, #6228d7)' }}>
                 <Instagram className="w-4 h-4" />
