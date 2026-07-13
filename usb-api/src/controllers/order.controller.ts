@@ -3,72 +3,85 @@ import { prisma } from "../lib/prisma.js";
 
 
 
-export async function createOrder(
-  req: Request,
-  res: Response
-) {
+export async function createOrder(req: Request, res: Response) {
   try {
+    console.log("===== NEW ORDER =====");
+    console.log(JSON.stringify(req.body, null, 2));
+
     const {
       customerName,
       phone,
       address,
       area,
       city,
-      items,
       total,
+      bowls,
     } = req.body;
-const invoiceNumber = `USB-${Date.now()}`;
-const { bowls } = req.body;
+
+    if (!customerName || !phone || !address || !area || !city) {
+      return res.status(400).json({
+        error: "Missing customer details",
+      });
+    }
+
+    if (!Array.isArray(bowls) || bowls.length === 0) {
+      return res.status(400).json({
+        error: "No bowls received",
+      });
+    }
+
+    const invoiceNumber = `USB-${Date.now()}`;
+
     const order = await prisma.order.create({
-  data: {
-    invoiceNumber,
-    total,
-    paymentMethod: "COD",
-    status: "PENDING",
+      data: {
+        invoiceNumber,
+        total: Number(total),
+        paymentMethod: "COD",
 
- customer: {
-  connectOrCreate: {
-    where: {
-      phone,
-    },
-    create: {
-      name: customerName,
-      phone,
-      address,
-      area,
-      city,
-    },
-  },
-},
+        customer: {
+          connectOrCreate: {
+            where: {
+              phone,
+            },
+            create: {
+              name: customerName,
+              phone,
+              address,
+              area,
+              city,
+            },
+          },
+        },
 
-    
+        bowls: {
+          create: bowls.map((b: any) => ({
+            bowlName: b.name,
+            quantity: Number(b.quantity),
+            price: Number(b.price),
+          })),
+        },
+      },
 
-    bowls: {
-      create: bowls.map((b: any) => ({
-        bowlName: b.name,
-        quantity: b.quantity,
-        price: b.price,
-      })),
-    },
-  },
+      include: {
+        customer: true,
+        bowls: true,
+      },
+    });
 
-  include: {
-    customer: true,
-    bowls: true,
-  },
-});
-    res.json(order);
-  } 
-catch (err: any) {
-  console.error("CREATE ORDER ERROR:", err);
+    return res.json(order);
+  } catch (err: any) {
+    console.error("========== CREATE ORDER ERROR ==========");
+    console.error(err);
+    console.error(err?.message);
+    console.error(err?.stack);
+    console.error("========================================");
 
-  res.status(500).json({
-    message: err?.message,
-    code: err?.code,
-    meta: err?.meta,
-  });
-}
-  
+    return res.status(500).json({
+      message: err?.message,
+      code: err?.code,
+      meta: err?.meta,
+    });
+  }
 }
 export async function getOrders(
   req: Request,
