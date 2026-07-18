@@ -1,5 +1,6 @@
 import { motion } from "motion/react";
 import { ArrowRight, MessageCircle } from "lucide-react";
+import HeroBowl from "../../assets/images/hero-bowl.png";
 
 
 interface HeroSectionProps {
@@ -134,7 +135,8 @@ export function HeroSection({ onBuildBowlClick }: HeroSectionProps) {
               className="relative w-full max-w-sm lg:max-w-full aspect-square"
             >
               <img
-                src="https://images.unsplash.com/photo-1597958792579-bd3517df6399?w=900&h=900&fit=crop&auto=format"
+                src={HeroBowl}
+                /*src="https://images.unsplash.com/photo-1597958792579-bd3517df6399?w=900&h=900&fit=crop&auto=format"*/
                 alt="Fresh colourful salad bowl with vibrant vegetables"
                 className="w-full h-full object-cover rounded-full"
                 style={{ maskImage: "radial-gradient(ellipse 90% 90% at 50% 50%, black 60%, transparent 100%)", WebkitMaskImage: "radial-gradient(ellipse 90% 90% at 50% 50%, black 60%, transparent 100%)" }}

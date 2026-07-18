@@ -5,12 +5,12 @@ const features = [
   {
     icon: Sliders,
     title: "Your Bowl, Your Rules",
-    description: "120+ ingredient combinations. We just execute — you decide what goes in.",
+    description: "As much ingredient combinations you can imagine. We just execute — you decide what goes in.",
   },
   {
     icon: Leaf,
     title: "Fresh, Not Frozen",
-    description: "Everything is prepped morning of. No microwaves, no shortcuts.",
+    description: "Prepared fresh every morning. No food colour, no shortcuts.",
   },
   {
     icon: Zap,

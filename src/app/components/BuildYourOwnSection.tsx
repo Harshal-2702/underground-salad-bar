@@ -1,11 +1,11 @@
 import { motion } from "motion/react";
 
 const categories = [
-  { name: "Base", items: ["Rice", "Wrap"], color: "#E2BD87", bg: "#FAF5E4" },
+  { name: "Base", items: ["Rice", "Wrap", "Burrito Wrap"], color: "#E2BD87", bg: "#FAF5E4" },
   { name: "Protein", items: ["Chicken", "Paneer", "Soya Chunks"], color: "#B36235", bg: "#FDF4EC" },
-  { name: "Veggies", items: ["Carrot", "Beetroot", "Broccoli", "Bell Pepper", "Lettuce", "Onion", "Baby Potato", "Corn"], color: "#1F3D2B", bg: "#EEF4EE" },
-  { name: "Beans", items: ["Chickpeas", "Kidney Beans"], color: "#8B5E3C", bg: "#F7F0E8" },
-  { name: "Dressing", items: ["Makhni", "Spinach", "Hung Curd Garlic", "Pesto", "Paprika", "Chipotle"], color: "#E98A15", bg: "#FDF5E8" },
+  { name: "Veggies", items: ["Carrot", "Beetroot", "Broccoli", "Bell Peppers"," Pickled Onion","Baby Potato", "Lettuce"], color: "#1F3D2B", bg: "#EEF4EE" },
+  { name: "Beans", items: ["Chickpeas", "Kidney Beans","Fresh Sprouts"], color: "#8B5E3C", bg: "#F7F0E8" },
+  { name: "Dressing", items: [ "Hung Curd Garlic", "Chipotle", "Paprika","Pesto", "Makhni", "Spinach",], color: "#E98A15", bg: "#FDF5E8" },
 ];
 
 export function BuildYourOwnSection() {
@@ -23,7 +23,7 @@ export function BuildYourOwnSection() {
             </h2>
           </div>
           <p className="font-['Sora'] text-[#1A1209]/60 text-sm max-w-xs leading-relaxed">
-            Mix and match from 5 categories. Over 120 combinations — and counting.
+            Mix and match from 5 categories and have as many combinations as you like — and counting.
           </p>
         </div>
 
