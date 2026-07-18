@@ -60,8 +60,8 @@ const LAYER_COLORS = {
 };
 
 const categories = [
-  { id: 'base',     name: 'Base',     subtitle: 'Your foundation',        pricePerScoop: 30,  items: ['Rice', 'Wrap'],                                                             note: null },
-  { id: 'protein',  name: 'Protein',  subtitle: 'Fresh-grilled daily',    pricePerScoop: 60,  items: ['Chicken', 'Paneer', 'Soya Chunks'],                                         note: null },
+  { id: 'base',     name: 'Base',     subtitle: 'Your foundation',        pricePerScoop: 40,  items: ['Rice', 'Wrap'],                                                             note: null },
+  { id: 'protein',  name: 'Protein',  subtitle: 'Fresh-grilled daily',    pricePerScoop: 59,  items: ['Chicken', 'Paneer', 'Soya Chunks'],                                         note: null },
   { id: 'veggies',  name: 'Veggies',  subtitle: 'Pick as many as you like', pricePerScoop: 40, items: ['Carrot', 'Beetroot', 'Baby Potato', 'Broccoli', 'Bell Pepper', 'Lettuce', 'Onion', 'Corn'], note: 'Unlimited variety per scoop' },
   { id: 'beans',    name: 'Beans',    subtitle: 'Extra protein & fibre',   pricePerScoop: 30,  items: ['Chickpeas', 'Kidney Beans'],                                                note: null },
   { id: 'dressing', name: 'Dressing', subtitle: 'The magic touch',         pricePerScoop: 50,  items: ['Makhni', 'Spinach', 'Hung Curd Garlic', 'Pesto', 'Paprika', 'Chipotle'], note: null },

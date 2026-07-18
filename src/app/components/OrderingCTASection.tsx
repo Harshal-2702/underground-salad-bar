@@ -47,7 +47,7 @@ export function OrderingCTASection({ onBuildBowlClick }: OrderingCTASectionProps
           </div>
 
           <p className="font-['Sora'] text-[#1A1209]/50 text-sm mb-10">
-            Free delivery on orders above ₹300 · Pune only
+            Free delivery on orders above ₹200 and within 8 km· Pune only
           </p>
 
           {/* Social order buttons */}

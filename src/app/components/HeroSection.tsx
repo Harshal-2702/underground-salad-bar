@@ -1,6 +1,7 @@
 import { motion } from "motion/react";
 import { ArrowRight, MessageCircle } from "lucide-react";
 
+
 interface HeroSectionProps {
   onBuildBowlClick: () => void;
 }
