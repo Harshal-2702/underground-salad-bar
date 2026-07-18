@@ -72,7 +72,7 @@ export function HeroSection({ onBuildBowlClick }: HeroSectionProps) {
               transition={{ duration: 0.6, delay: 0.2 }}
               className="text-[#E98A15] mb-8"
             >
-              Fuel Your Day.
+              Fuel Your Day Test 001.
             </motion.h1>
 
             <motion.p
