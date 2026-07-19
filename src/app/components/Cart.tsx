@@ -1,17 +1,26 @@
 import { useState } from 'react';
 import { X, Trash2, Plus, ArrowRight, CheckCircle2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Bowl } from './BowlBuilder';
+import { Bowl, BowlItem } from "./BowlBuilder";
 export const API_URL = "https://usb-api.onrender.com";
 
 interface CartProps {
-  isOpen: boolean;
-  onClose: () => void;
-  bowls: Bowl[];
-  onRemoveBowl: (bowlId: string) => void;
-  onBuildAnother: () => void;
-}
 
+  isOpen: boolean;
+
+  onClose: () => void;
+
+  bowls: Bowl[];
+
+  updateBowls: (
+    updater: (prev: Bowl[]) => Bowl[]
+  ) => void;
+
+  onRemoveBowl: (id: string) => void;
+
+  onBuildAnother: () => void;
+
+}
 type CartView = 'cart' | 'checkout' | 'success';
 
 const PUNE_AREAS = [
@@ -21,12 +30,103 @@ const PUNE_AREAS = [
   "Wakad", "Wanowrie", "Other",
 ];
 
-export function Cart({ isOpen, onClose, bowls, onRemoveBowl, onBuildAnother }: CartProps) {
+export function Cart({
+
+isOpen,
+
+onClose,
+
+bowls,
+
+updateBowls,
+
+onRemoveBowl,
+
+onBuildAnother,
+
+}: CartProps){
   const [view, setView] = useState<CartView>('cart');
   const [form, setForm] = useState({ name: '', phone: '', address: '', area: '', city: 'Pune' });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const grandTotal = bowls.reduce((sum, bowl) => sum + bowl.total, 0);
+  const recalculateTotal = (items: BowlItem[]) => {
+  return items.reduce(
+    (sum, item) => sum + item.price * item.scoops,
+    0
+  );
+};
+
+const increaseScoops = (bowlId: string, itemId: string) => {
+  updateBowls(prev =>
+    prev.map(bowl => {
+      if (bowl.id !== bowlId) return bowl;
+
+      const items = bowl.items.map(item =>
+        item.id === itemId
+          ? { ...item, scoops: item.scoops + 1 }
+          : item
+      );
+
+      return {
+        ...bowl,
+        items,
+        total: recalculateTotal(items),
+      };
+    })
+  );
+};
+
+const decreaseScoops = (bowlId: string, itemId: string) => {
+  updateBowls(prev =>
+    prev
+      .map(bowl => {
+        if (bowl.id !== bowlId) return bowl;
+
+        const items = bowl.items
+          .map(item => {
+            if (item.id !== itemId) return item;
+
+            if (item.scoops === 1) {
+              return null;
+            }
+
+            return {
+              ...item,
+              scoops: item.scoops - 1,
+            };
+          })
+          .filter(Boolean) as BowlItem[];
+
+        return {
+          ...bowl,
+          items,
+          total: recalculateTotal(items),
+        };
+      })
+      .filter(bowl => bowl.items.length > 0)
+  );
+};
+
+const deleteIngredient = (bowlId: string, itemId: string) => {
+  updateBowls(prev =>
+    prev
+      .map(bowl => {
+        if (bowl.id !== bowlId) return bowl;
+
+        const items = bowl.items.filter(
+          item => item.id !== itemId
+        );
+
+        return {
+          ...bowl,
+          items,
+          total: recalculateTotal(items),
+        };
+      })
+      .filter(bowl => bowl.items.length > 0)
+  );
+};
 
   const handleClose = () => {
     setView('cart');
@@ -171,19 +271,51 @@ body: JSON.stringify({
                           </button>
                         </div>
                         <div className="space-y-1.5 mb-3">
-                          {bowl.items.map(item => (
-                            <div key={item.id} className="flex justify-between items-start text-sm">
-                              <div>
-                                <span className="font-['Sora'] font-medium text-[#1A1209]">{item.name}</span>
-                                {item.veggieSelection && item.veggieSelection.length > 0 && (
-                                  <p className="font-['Sora'] text-[#1A1209]/40 text-xs mt-0.5">{item.veggieSelection.join(', ')}</p>
-                                )}
-                                <p className="font-['Sora'] text-[#1A1209]/40 text-xs">{item.scoops} scoop{item.scoops > 1 ? 's' : ''}</p>
-                              </div>
-                              <span className="font-['Sora'] font-semibold text-[#1A1209]">₹{item.price * item.scoops}</span>
-                            </div>
-                            
-                          ))}
+                          {bowl.items.map((item) => (
+<div
+  key={item.id}
+  className="flex items-center justify-between py-1"
+>
+  <div className="text-sm">
+    {item.name}
+  </div>
+
+  <div className="flex items-center gap-2">
+
+    <button
+      onClick={() =>
+        decreaseScoops(bowl.id, item.id)
+      }
+      className="w-6 h-6 rounded-full border"
+    >
+      -
+    </button>
+
+    <span className="text-sm">
+      {item.scoops}
+    </span>
+
+    <button
+      onClick={() =>
+        increaseScoops(bowl.id, item.id)
+      }
+      className="w-6 h-6 rounded-full border"
+    >
+      +
+    </button>
+
+    <button
+      onClick={() =>
+        deleteIngredient(bowl.id, item.id)
+      }
+      className="text-red-500 ml-2"
+    >
+      ✕
+    </button>
+
+  </div>
+</div>
+))}
                         </div>
                         <div className="pt-3 border-t border-[#1A1209]/8 flex justify-between items-center">
                           <span className="font-['Sora'] text-[#1A1209]/50 text-xs">Bowl total</span>
@@ -372,4 +504,7 @@ body: JSON.stringify({
       </motion.div>
     </>
   );
+
+ 
+  
 }

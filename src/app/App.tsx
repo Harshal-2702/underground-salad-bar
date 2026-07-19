@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { motion, AnimatePresence } from "motion/react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Header } from "./components/Header";
 import { Footer } from "./components/Footer";
 import { HomePage } from "./components/HomePage";
@@ -32,6 +32,9 @@ export default function App() {
   const [isCartOpen, setIsCartOpen] = useState(false);
 
 const [cartBowls, setCartBowls] = useState<Bowl[]>([]);
+const updateBowls = (updater: (prev: Bowl[]) => Bowl[]) => {
+  setCartBowls(updater);
+};
 
 interface SubscriptionPlan {
   id: string;
@@ -73,6 +76,14 @@ const [subscriptions, setSubscriptions] = useState<SubscriptionPlan[]>([]);
   const handleRemoveBowl = useCallback((bowlId: string) => {
     setCartBowls(prev => prev.filter((bowl) => bowl.id !== bowlId));
   }, []);
+
+  const updateBowl = (updatedBowl: Bowl) => {
+  setCartBowls((prev) =>
+    prev.map((bowl) =>
+      bowl.id === updatedBowl.id ? updatedBowl : bowl
+    )
+  );
+};
 
   const closeBowlBuilder = useCallback(() => setIsBowlBuilderOpen(false), []);
   const closeCart = useCallback(() => setIsCartOpen(false), []);
@@ -127,26 +138,37 @@ const [subscriptions, setSubscriptions] = useState<SubscriptionPlan[]>([]);
       <WhatsAppButton />
 
       {/* Bowl Builder Modal */}
-      <AnimatePresence>
-        {isBowlBuilderOpen && (
-          <BowlBuilder
-            isOpen={isBowlBuilderOpen}
-            onClose={closeBowlBuilder}
-            onAddToCart={handleAddToCart}
-          />
-        )}
-      </AnimatePresence>
+      {isBowlBuilderOpen && (
+  <BowlBuilder
+    isOpen={isBowlBuilderOpen}
+    onClose={closeBowlBuilder}
+    onAddToCart={handleAddToCart}
+  />
+)}
+
+      {isBowlBuilderOpen && (
+  <BowlBuilder
+    isOpen={isBowlBuilderOpen}
+    onClose={closeBowlBuilder}
+    onAddToCart={handleAddToCart}
+  />
+)}
 
       {/* Cart Side Panel */}
       <AnimatePresence>
         {isCartOpen && (
           <Cart
-            isOpen={isCartOpen}
-            onClose={closeCart}
-            bowls={cartBowls}
-            onRemoveBowl={handleRemoveBowl}
-            onBuildAnother={handleBuildBowlClick}
-          />
+    isOpen={isCartOpen}
+    onClose={closeCart}
+
+    bowls={cartBowls}
+
+    updateBowls={updateBowls}
+
+    onRemoveBowl={handleRemoveBowl}
+
+    onBuildAnother={handleBuildBowlClick}
+/>
         )}
       </AnimatePresence>
 

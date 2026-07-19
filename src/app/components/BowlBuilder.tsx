@@ -1,14 +1,21 @@
 import { useState } from 'react';
 import { Plus, Minus, X, Check, ChevronLeft, ChevronRight } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence } from "framer-motion";
 
 export interface BowlItem {
   id: string;
+
   name: string;
+
   category: string;
+
   price: number;
+
   scoops: number;
+
   veggieSelection?: string[];
+
+  removable?: boolean;
 }
 
 export interface Bowl {
@@ -179,8 +186,27 @@ export function BowlBuilder({ isOpen, onClose, onAddToCart }: BowlBuilderProps) 
 
   const currentCategory = categories[currentStep];
 
-  const handleVeggieToggle = (name: string) =>
-    setSelectedVeggies(prev => prev.includes(name) ? prev.filter(v => v !== name) : [...prev, name]);
+ const handleVeggieToggle = (name: string) => {
+  setSelectedVeggies(prev => {
+    const exists = prev.includes(name);
+
+    const updated = exists
+      ? prev.filter(v => v !== name)
+      : [...prev, name];
+
+    // First veggie selected → automatically add 1 scoop
+    if (!exists && prev.length === 0 && veggieScoops === 0) {
+      setVeggieScoops(1);
+    }
+
+    // Last veggie removed → reset scoops
+    if (exists && updated.length === 0) {
+      setVeggieScoops(0);
+    }
+
+    return updated;
+  });
+};
 
   const handleAddItem = (itemName: string) => {
     const existing = selectedItems.find(i => i.name === itemName && i.category === currentCategory.id);
@@ -201,8 +227,8 @@ export function BowlBuilder({ isOpen, onClose, onAddToCart }: BowlBuilderProps) 
   const getItemScoops = (itemName: string) =>
     selectedItems.find(i => i.name === itemName && i.category === currentCategory.id)?.scoops || 0;
 
-  const calculateTotal = () =>
-    selectedItems.reduce((sum, i) => sum + i.price * i.scoops, 0) + (veggieScoops > 0 ? veggieScoops * 40 : 0);
+const calculateTotal = () =>
+  selectedItems.reduce((sum, i) => sum + i.price * i.scoops, 0);
 
   const saveVeggies = () => {
     if (currentStep === 2 && veggieScoops > 0 && selectedVeggies.length > 0) {
@@ -220,8 +246,20 @@ export function BowlBuilder({ isOpen, onClose, onAddToCart }: BowlBuilderProps) 
       finalItems = [...finalItems.filter(i => i.category !== 'veggies'), { id: `veggies-${Date.now()}`, name: 'Veggie Scoop', category: 'veggies', price: 40, scoops: veggieScoops, veggieSelection: selectedVeggies }];
     }
     if (finalItems.length === 0 && veggieScoops === 0) return;
-    onAddToCart({ id: `bowl-${Date.now()}`, items: finalItems, total: calculateTotal() });
-    setSelectedItems([]); setVeggieScoops(0); setSelectedVeggies([]); setCurrentStep(0); onClose();
+   onClose();
+
+setTimeout(() => {
+  onAddToCart({
+    id: `bowl-${Date.now()}`,
+    items: finalItems,
+    total: calculateTotal(),
+  });
+
+  setSelectedItems([]);
+  setVeggieScoops(0);
+  setSelectedVeggies([]);
+  setCurrentStep(0);
+}, 0);
   };
 
 const handleClose = () => {
