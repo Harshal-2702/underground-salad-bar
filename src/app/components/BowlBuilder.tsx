@@ -208,21 +208,191 @@ export function BowlBuilder({ isOpen, onClose, onAddToCart }: BowlBuilderProps) 
   });
 };
 
-  const handleAddItem = (itemName: string) => {
-    const existing = selectedItems.find(i => i.name === itemName && i.category === currentCategory.id);
-    if (existing) {
-      setSelectedItems(prev => prev.map(i => i.id === existing.id ? { ...i, scoops: i.scoops + 1 } : i));
-    } else {
-      setSelectedItems(prev => [...prev, { id: `${currentCategory.id}-${itemName}-${Date.now()}`, name: itemName, category: currentCategory.id, price: currentCategory.pricePerScoop, scoops: 1 }]);
-    }
-  };
+const handleAddItem = (itemName: string) => {
+  // ===== SPECIAL LOGIC FOR BEANS =====
+  if (currentCategory.id === "beans") {
+    const beanItems = selectedItems.filter(i => i.category === "beans");
+    const clickedBean = beanItems.find(i => i.name === itemName);
 
-  const handleRemoveItem = (itemId: string) => {
-    const item = selectedItems.find(i => i.id === itemId);
-    if (!item) return;
-    if (item.scoops > 1) setSelectedItems(prev => prev.map(i => i.id === itemId ? { ...i, scoops: i.scoops - 1 } : i));
-    else setSelectedItems(prev => prev.filter(i => i.id !== itemId));
-  };
+    // First bean
+    if (beanItems.length === 0) {
+      setSelectedItems(prev => [
+        ...prev,
+        {
+          id: `beans-${itemName}-${Date.now()}`,
+          name: itemName,
+          category: "beans",
+          price: currentCategory.pricePerScoop,
+          scoops: 1,
+        },
+      ]);
+      return;
+    }
+
+    // Second bean selected for the first time
+    if (!clickedBean && beanItems.length === 1) {
+      setSelectedItems(prev =>
+        prev.flatMap(item => {
+          if (item.category !== "beans") return item;
+
+          return {
+            ...item,
+            scoops: 0.5,
+          };
+        }).concat({
+          id: `beans-${itemName}-${Date.now()}`,
+          name: itemName,
+          category: "beans",
+          price: currentCategory.pricePerScoop,
+          scoops: 0.5,
+        })
+      );
+
+      return;
+    }
+
+    // Already two beans selected
+    if (beanItems.length === 2) {
+      setSelectedItems(prev =>
+        prev.map(item =>
+          item.category === "beans"
+            ? {
+                ...item,
+                scoops: item.scoops + 0.5,
+              }
+            : item
+        )
+      );
+
+      return;
+    }
+
+    // One bean selected and clicking same bean
+    if (beanItems.length === 1 && clickedBean) {
+      setSelectedItems(prev =>
+        prev.map(item =>
+          item.id === clickedBean.id
+            ? {
+                ...item,
+                scoops: item.scoops + 1,
+              }
+            : item
+        )
+      );
+
+      return;
+    }
+  }
+
+  // ===== NORMAL ITEMS =====
+  const existing = selectedItems.find(
+    i => i.name === itemName && i.category === currentCategory.id
+  );
+
+  if (existing) {
+    setSelectedItems(prev =>
+      prev.map(i =>
+        i.id === existing.id
+          ? {
+              ...i,
+              scoops: i.scoops + 1,
+            }
+          : i
+      )
+    );
+  } else {
+    setSelectedItems(prev => [
+      ...prev,
+      {
+        id: `${currentCategory.id}-${itemName}-${Date.now()}`,
+        name: itemName,
+        category: currentCategory.id,
+        price: currentCategory.pricePerScoop,
+        scoops: 1,
+      },
+    ]);
+  }
+};
+
+const handleRemoveItem = (itemId: string) => {
+  const item = selectedItems.find(i => i.id === itemId);
+  if (!item) return;
+
+  // ===== SPECIAL LOGIC FOR BEANS =====
+  if (item.category === "beans") {
+    const beanItems = selectedItems.filter(i => i.category === "beans");
+
+    // Only one bean
+    if (beanItems.length === 1) {
+      if (item.scoops > 1) {
+        setSelectedItems(prev =>
+          prev.map(i =>
+            i.id === itemId
+              ? {
+                  ...i,
+                  scoops: i.scoops - 1,
+                }
+              : i
+          )
+        );
+      } else {
+        setSelectedItems(prev => prev.filter(i => i.id !== itemId));
+      }
+
+      return;
+    }
+
+    // Two beans selected
+
+    // If currently 0.5 each, removing one should leave the other at 1 scoop
+    if (beanItems.every(b => b.scoops === 0.5)) {
+      setSelectedItems(prev =>
+        prev
+          .filter(i => i.id !== itemId)
+          .map(i =>
+            i.category === "beans"
+              ? {
+                  ...i,
+                  scoops: 1,
+                }
+              : i
+          )
+      );
+
+      return;
+    }
+
+    // Reduce both together
+    setSelectedItems(prev =>
+      prev.map(i =>
+        i.category === "beans"
+          ? {
+              ...i,
+              scoops: i.scoops - 0.5,
+            }
+          : i
+      )
+    );
+
+    return;
+  }
+
+  // ===== NORMAL ITEMS =====
+  if (item.scoops > 1) {
+    setSelectedItems(prev =>
+      prev.map(i =>
+        i.id === itemId
+          ? {
+              ...i,
+              scoops: i.scoops - 1,
+            }
+          : i
+      )
+    );
+  } else {
+    setSelectedItems(prev => prev.filter(i => i.id !== itemId));
+  }
+};
 
   const getItemScoops = (itemName: string) =>
     selectedItems.find(i => i.name === itemName && i.category === currentCategory.id)?.scoops || 0;

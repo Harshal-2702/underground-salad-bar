@@ -1,5 +1,8 @@
 import { Plus } from 'lucide-react';
 import { motion } from 'motion/react';
+import ContinentalBowl from "../../assets/images/Continental_Bowl.png";
+import BurritoBowl from "../../assets/images/Burrito_Bowl.png";
+import KimchiBowl from "../../assets/images/Kimchi_Bowl.png";
 
 interface PreMadeBowl {
   id: string;
@@ -22,7 +25,8 @@ const preMadeBowls: PreMadeBowl[] = [
     price: 289,
     tag: 'Best Seller',
     tagColor: '#1F3D2B',
-    imgUrl: 'https://images.unsplash.com/photo-1597958792579-bd3517df6399?w=600&h=450&fit=crop&auto=format',
+    //imgUrl: 'https://images.unsplash.com/photo-1597958792579-bd3517df6399?w=600&h=450&fit=crop&auto=format',
+    imgUrl: ContinentalBowl,
     accentColor: '#1F3D2B',
   },
   {
@@ -33,7 +37,8 @@ const preMadeBowls: PreMadeBowl[] = [
     price: 339,
     tag: 'Fan Favourite',
     tagColor: '#B36235',
-    imgUrl: 'https://images.unsplash.com/photo-1602881916963-5daf2d97c06e?w=600&h=450&fit=crop&auto=format',
+    //imgUrl: 'https://images.unsplash.com/photo-1602881916963-5daf2d97c06e?w=600&h=450&fit=crop&auto=format',
+    imgUrl: BurritoBowl,
     accentColor: '#B36235',
   },
   {
@@ -44,7 +49,8 @@ const preMadeBowls: PreMadeBowl[] = [
     price: 279,
     tag: 'New',
     tagColor: '#E98A15',
-    imgUrl: 'https://images.unsplash.com/photo-1569246294372-ed319c674f14?w=600&h=450&fit=crop&auto=format',
+    //imgUrl: 'https://images.unsplash.com/photo-1569246294372-ed319c674f14?w=600&h=450&fit=crop&auto=format',
+    imgUrl: KimchiBowl,
     accentColor: '#E98A15',
   },
 ];

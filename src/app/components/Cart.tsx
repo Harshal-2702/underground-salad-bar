@@ -23,11 +23,23 @@ interface CartProps {
 }
 type CartView = 'cart' | 'checkout' | 'success';
 
-const PUNE_AREAS = [
-  "Aundh", "Baner", "Balewadi", "Camp", "Deccan", "FC Road", "Hadapsar",
-  "Hinjawadi", "Kalyani Nagar", "Kharadi", "Koregaon Park", "Kothrud",
-  "Magarpatta", "Mundhwa", "Pashan", "Pimpri", "Shivajinagar", "Viman Nagar",
-  "Wakad", "Wanowrie", "Other",
+const DELIVERY_AREAS = [
+  { name: "Shivajinagar", deliveryCharge: 0 },
+  { name: "Aundh", deliveryCharge: 0 },
+  { name: "Baner", deliveryCharge: 0 },
+  { name: "Balewadi", deliveryCharge: 0 },
+  { name: "Pashan", deliveryCharge: 0 },
+  { name: "Pimple Saudagar", deliveryCharge: 0 },
+  { name: "Pimple Nilakh", deliveryCharge: 0 },
+  { name: "Bopodi", deliveryCharge: 0 },
+  { name: "Pune University", deliveryCharge: 0 },
+  { name: "Camp", deliveryCharge: 50 },
+  { name: "Sus Road", deliveryCharge: 50 },
+  { name: "Wakad", deliveryCharge: 50 },
+  { name: "Khadki", deliveryCharge: 50 },
+  { name: "Wakdewadi", deliveryCharge: 50 },
+
+  { name: "Other", deliveryCharge: 60 },
 ];
 
 export function Cart({
@@ -50,7 +62,17 @@ onBuildAnother,
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const grandTotal = bowls.reduce((sum, bowl) => sum + bowl.total, 0);
-  const recalculateTotal = (items: BowlItem[]) => {
+
+// Find selected area's delivery charge
+const selectedArea = DELIVERY_AREAS.find(
+  area => area.name === form.area
+);
+
+const deliveryCharge = selectedArea?.deliveryCharge ?? 0;
+
+const finalTotal = grandTotal + deliveryCharge;
+
+const recalculateTotal = (items: BowlItem[]) => {
   return items.reduce(
     (sum, item) => sum + item.price * item.scoops,
     0
@@ -426,7 +448,11 @@ body: JSON.stringify({
                       className={`w-full px-4 py-3 rounded-xl border font-['Sora'] text-sm bg-white outline-none transition-colors ${errors.area ? 'border-red-400' : 'border-[#1A1209]/15 focus:border-[#1F3D2B]'}`}
                     >
                       <option value="">Select your area</option>
-                      {PUNE_AREAS.map(a => <option key={a} value={a}>{a}</option>)}
+                     {DELIVERY_AREAS.map(area => (
+                      <option key={area.name} value={area.name}>
+                      {area.name}
+                      </option>
+                      ))}
                     </select>
                     {errors.area && <p className="font-['Sora'] text-red-500 text-xs mt-1">{errors.area}</p>}
                   </div>
@@ -451,11 +477,11 @@ body: JSON.stringify({
                     </div>
                     <div className="flex justify-between mt-1">
                       <span className="font-['Sora'] text-sm text-[#1A1209]/50">Delivery</span>
-                      <span className="font-['Sora'] text-sm text-[#1F3D2B] font-semibold">{grandTotal >= 300 ? 'FREE' : '₹40'}</span>
+                      <span className="font-['Sora'] text-sm text-[#1F3D2B] font-semibold">{deliveryCharge === 0 ? "FREE" : `₹${deliveryCharge}`}</span>
                     </div>
                     <div className="pt-2 mt-2 border-t border-[#1A1209]/8 flex justify-between">
                       <span className="font-['Sora'] text-sm font-semibold text-[#1A1209]">Total</span>
-                      <span className="font-['Anton'] text-[#E98A15] text-xl">₹{grandTotal >= 300 ? grandTotal : grandTotal + 40}</span>
+                      <span className="font-['Anton'] text-[#E98A15] text-xl">₹{finalTotal}</span>
                     </div>
                   </div>
                 </div>
@@ -466,7 +492,7 @@ body: JSON.stringify({
                   onClick={handlePlaceOrder}
                   className="w-full py-4 bg-[#1F3D2B] hover:bg-[#162d1f] text-[#E2BD87] rounded-full font-['Sora'] font-semibold tracking-wide transition-colors"
                 >
-                  Place Order · ₹{grandTotal >= 300 ? grandTotal : grandTotal + 40}
+                  Place Order · ₹{finalTotal}
                 </button>
               </div>
             </motion.div>
