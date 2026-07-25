@@ -1,5 +1,10 @@
 import { motion } from "motion/react";
 
+import Base from "../../assets/images/Base.png";
+import Veggitables from "../../assets/images/Veggitables.png";
+import Dressing from "../../assets/images/Dressing.png";
+import Protein from "../../assets/images/Protein.png";
+
 interface HowItWorksSectionProps {
   onBuildBowlClick: () => void;
 }
@@ -11,7 +16,8 @@ const steps = [
     description: "Rice or Wrap — your foundation",
     detail: "Rice or Wheat wrap to hold it all together.",
     color: "#1F3D2B",
-    img: "https://images.unsplash.com/photo-1579113800032-c38bd7635818?w=400&h=400&fit=crop&auto=format",
+    //img: "https://images.unsplash.com/photo-1579113800032-c38bd7635818?w=400&h=400&fit=crop&auto=format",
+    img: Base,
   },
   {
     number: "02",
@@ -19,7 +25,8 @@ const steps = [
     description: "Chicken, Paneer or Soya",
     detail: "Grilled fresh daily. No compromises on quality.",
     color: "#B36235",
-    img: "https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=400&h=400&fit=crop&auto=format",
+    //img: "https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=400&h=400&fit=crop&auto=format",
+    img: Protein,
   },
   {
     number: "03",
@@ -27,7 +34,8 @@ const steps = [
     description: "Pick as many as you like",
     detail: "Carrot, beetroot, pickled onion, broccoli, bell peppers, baby potato, beans, lettuce — the more the merrier.",
     color: "#1F3D2B",
-    img: "https://images.unsplash.com/photo-1590779033100-9f60a05a013d?w=400&h=400&fit=crop&auto=format",
+    //img: "https://images.unsplash.com/photo-1590779033100-9f60a05a013d?w=400&h=400&fit=crop&auto=format",
+    img: Veggitables,
   },
   {
     number: "04",
@@ -35,7 +43,8 @@ const steps = [
     description: "Indian-inspired signature sauces",
     detail: "Hung Curd Garlic, Chipotle, Paprika, Pesto, Makhni or Spinach",
     color: "#E98A15",
-    img: "https://images.unsplash.com/photo-1543364195-bfe6e4932397?w=400&h=400&fit=crop&auto=format",
+    //img: "https://images.unsplash.com/photo-1543364195-bfe6e4932397?w=400&h=400&fit=crop&auto=format",
+    img: Dressing,
   },
 ];
 
