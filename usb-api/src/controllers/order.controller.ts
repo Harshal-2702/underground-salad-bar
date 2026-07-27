@@ -1,5 +1,6 @@
 import type { Request, Response } from "express";
 import { prisma } from "../lib/prisma.js";
+import { sendTelegramMessage } from "../services/telegram.service.js";
 
 
 
@@ -73,6 +74,17 @@ create: bowls.map((b: any) => ({
         bowls: true,
       },
     });
+
+    await sendTelegramMessage(`
+🥗 <b>NEW TEST ORDER</b>
+
+Customer: ${customerName}
+Phone: ${phone}
+
+Total: ₹${total}
+
+Invoice: ${invoiceNumber}
+`);
 
     return res.json(order);
   } catch (err: any) {

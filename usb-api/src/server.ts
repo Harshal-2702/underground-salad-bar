@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import { supabase } from "./services/supabase.js";
 
 import orderRoutes from "./routes/order.routes.js";
 
@@ -18,6 +19,37 @@ app.get("/health", (req, res) => {
     service: "Underground Salad Bar API",
     time: new Date(),
   });
+});
+
+app.get("/test-supabase", async (_, res) => {
+  try {
+    const { data, error } = await supabase
+      .from("orders")
+      .insert([
+        {
+          customer_name: "Harshal Test",
+          phone: "9999999999",
+          total: 250,
+          status: "pending",
+        },
+      ])
+      .select();
+
+    if (error) {
+      console.error(error);
+
+      return res.status(500).json(error);
+    }
+
+    res.json({
+      success: true,
+      data,
+    });
+  } catch (err) {
+    console.error(err);
+
+    res.status(500).json(err);
+  }
 });
 
 app.use("/orders", orderRoutes);
