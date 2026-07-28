@@ -1,6 +1,10 @@
 import { ArrowRight, MessageCircle, Instagram } from "lucide-react";
 import { motion } from "motion/react";
 
+const whatsappMessage = encodeURIComponent(
+  "Hi Underground! I'd like to build my own bowl."
+);
+
 interface OrderingCTASectionProps {
   onBuildBowlClick: () => void;
 }
@@ -38,7 +42,7 @@ export function OrderingCTASection({ onBuildBowlClick }: OrderingCTASectionProps
               <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
             </button>
             <a
-              href="https://wa.me/+918208707976?text=Hi%20Underground%20Salad%20Bar,%20I%20want%20to%20place%20an%20order."
+              href={`https://wa.me/918208707976?text=${whatsappMessage}`}
               className="flex items-center justify-center gap-2.5 px-8 py-4 bg-white/50 hover:bg-white/80 text-[#1A1209] rounded-full font-['Sora'] font-semibold tracking-wide transition-all border border-[#1A1209]/10"
             >
               <MessageCircle className="w-5 h-5" />

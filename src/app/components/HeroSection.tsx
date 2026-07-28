@@ -2,6 +2,10 @@ import { motion } from "motion/react";
 import { ArrowRight, MessageCircle } from "lucide-react";
 import HeroBowl from "../../assets/images/hero-bowl.png";
 
+const whatsappMessage = encodeURIComponent(
+  "Hi Underground! I'd like to build my own bowl."
+);
+
 
 interface HeroSectionProps {
   onBuildBowlClick: () => void;
@@ -109,7 +113,7 @@ export function HeroSection({ onBuildBowlClick }: HeroSectionProps) {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.6 }}
-              href="https://wa.me/918208707976"
+              href={`https://wa.me/918208707976?text=${whatsappMessage}`}
               className="inline-flex items-center gap-2 font-['Sora'] text-sm text-[#FAF5E4]/40 hover:text-[#25D366] transition-colors"
             >
               <MessageCircle className="w-4 h-4" />
