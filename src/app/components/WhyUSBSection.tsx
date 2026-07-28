@@ -46,13 +46,13 @@ export function WhyUSBSection() {
 
             <div className="mt-8 flex items-center gap-4">
               <div className="w-12 h-12 rounded-full overflow-hidden bg-[#E2BD87]/20 border-2 border-[#E2BD87]/30">
-                <img src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop&auto=format" alt="Customer" className="w-full h-full object-cover" />
+                {/* <img src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop&auto=format" alt="Customer" className="w-full h-full object-cover" /> */}
               </div>
               <div className="w-12 h-12 rounded-full overflow-hidden bg-[#E2BD87]/20 border-2 border-[#E2BD87]/30 -ml-3">
-                <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&auto=format" alt="Customer" className="w-full h-full object-cover" />
+                {/* <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&auto=format" alt="Customer" className="w-full h-full object-cover" /> */}
               </div>
               <div className="w-12 h-12 rounded-full overflow-hidden bg-[#E2BD87]/20 border-2 border-[#E2BD87]/30 -ml-3">
-                <img src="https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop&auto=format" alt="Customer" className="w-full h-full object-cover" />
+                {/* <img src="https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop&auto=format" alt="Customer" className="w-full h-full object-cover" /> */}
               </div>
               <div className="ml-2">
                 <p className="font-['Anton'] text-[#E2BD87] text-lg">500+ bowls</p>
