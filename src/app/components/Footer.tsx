@@ -39,7 +39,7 @@ export function Footer() {
             <p className="font-['Sora'] text-[#E2BD87] text-xs font-semibold tracking-widest uppercase mb-4">Order &amp; Follow</p>
             <div className="space-y-3">
               <p className="font-['Sora'] text-[#FAF5E4]/60 text-sm">📍 Delivering across Pune</p>
-              <a href="https://wa.me/919999999999"
+              <a href="https://wa.me/918208707976"
                 className="inline-flex items-center gap-2 font-['Sora'] text-[#FAF5E4]/60 text-sm hover:text-[#25D366] transition-colors">
                 <MessageCircle className="w-4 h-4" />
                 WhatsApp us

@@ -109,7 +109,7 @@ export function HeroSection({ onBuildBowlClick }: HeroSectionProps) {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.6 }}
-              href="https://wa.me/919999999999"
+              href="https://wa.me/918208707976"
               className="inline-flex items-center gap-2 font-['Sora'] text-sm text-[#FAF5E4]/40 hover:text-[#25D366] transition-colors"
             >
               <MessageCircle className="w-4 h-4" />
