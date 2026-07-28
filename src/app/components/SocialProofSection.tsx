@@ -4,24 +4,24 @@ import { motion } from "motion/react";
 const testimonials = [
   {
     name: "Priya S.",
-    role: "Software Engineer, Hinjawadi",
-    text: "Best lunch option near the office. The Continental Bowl is my daily fuel. Never going back to canteen food.",
+    role: "Software Engineer, Baner",
+    text: "Best and Affordable Bowls, I have tried many lunch subscription services but Underground is the best. I can customize my bowl and get it delivered on time.",
     rating: 5,
-    img: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop&auto=format",
+    //img: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop&auto=format",
   },
   {
     name: "Rahul M.",
     role: "MBA Student, Pune",
-    text: "Honestly didn't expect it to be this good. The Mexican Bowl hits different — smoky, spicy, filling. And it's actually affordable.",
+    text: "Underground helps me forget lunch thought, I use to eat junk food due to on time planning now I schedule my lunch with Underground and new bowls everyday so never gets boring.",
     rating: 5,
-    img: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&auto=format",
+    //img: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&auto=format",
   },
   {
-    name: "Sneha K.",
-    role: "Startup Founder, Koregaon Park",
-    text: "Finally a bowl place that understands portion size AND taste. The Kimchi Bowl is wild. Come try it.",
+    name: "Bhima K.",
+    role: "Software Engineer, Aundh",
+    text: "Underground Salad Bar is my go-to for a quick, healthy meal. The ingredients are fresh, and the bowls are customizable. Highly recommend!",
     rating: 5,
-    img: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop&auto=format",
+    //img: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop&auto=format",
   },
 ];
 
@@ -68,7 +68,7 @@ export function SocialProofSection() {
                 "{t.text}"
               </p>
               <div className="flex items-center gap-3 pt-4 border-t border-[#1A1209]/6">
-                <img src={t.img} alt={t.name} className="w-10 h-10 rounded-full object-cover" />
+                {/* <img src={t.img} alt={t.name} className="w-10 h-10 rounded-full object-cover" /> */}
                 <div>
                   <p className="font-['Sora'] font-semibold text-[#1F3D2B] text-sm">{t.name}</p>
                   <p className="font-['Sora'] text-[#1A1209]/40 text-xs">{t.role}</p>
