@@ -2,7 +2,7 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import { supabase } from "./services/supabase.js";
-
+import { prisma } from "./lib/prisma.js";
 import orderRoutes from "./routes/order.routes.js";
 
 dotenv.config();
@@ -19,6 +19,24 @@ app.get("/health", (req, res) => {
     service: "Underground Salad Bar API",
     time: new Date(),
   });
+});
+
+app.get("/ping-db", async (_, res) => {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+
+    res.json({
+      success: true,
+      message: "Database Awake",
+      time: new Date(),
+    });
+  } catch (err) {
+    console.error(err);
+
+    res.status(500).json({
+      success: false,
+    });
+  }
 });
 
 app.get("/test-supabase", async (_, res) => {
