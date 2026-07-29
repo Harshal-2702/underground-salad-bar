@@ -259,37 +259,93 @@ setView("success");
          {/* 👇 ADD THE LOADING SCREEN HERE 👇 */}
 
       <AnimatePresence>
-        {isPlacingOrder && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="absolute inset-0 z-[999] bg-[#1F3D2B] flex items-center justify-center"
-          >
-            <div className="text-center">
+  {isPlacingOrder && (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="absolute inset-0 z-[999] bg-[#1F3D2B] flex items-center justify-center"
+    >
+      <div className="text-center w-full px-8">
 
-              <motion.div
-                animate={{ rotate: 360 }}
-                transition={{
-                  repeat: Infinity,
-                  duration: 1,
-                  ease: "linear",
-                }}
-                className="w-16 h-16 border-4 border-[#E2BD87]/20 border-t-[#E98A15] rounded-full mx-auto mb-8"
-              />
+        {/* Bowl */}
 
-              <h2 className="font-['Anton'] text-3xl text-[#E2BD87]">
-                Building Your Bowl...
-              </h2>
+        <div className="relative w-52 mx-auto mb-10">
 
-              <p className="font-['Sora'] text-[#FAF5E4]/70 mt-3">
-                Please wait while we place your order.
-              </p>
+          {/* Bowl */}
+          <div className="relative h-28 border-[6px] border-[#E2BD87] rounded-b-[100px] overflow-hidden bg-[#29533A]">
 
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            {/* Rice */}
+            <motion.div
+              initial={{ height: 0 }}
+              animate={{ height: "25%" }}
+              transition={{ duration: 0.5 }}
+              className="absolute bottom-0 w-full bg-[#F5E6B3]"
+            />
+
+            {/* Protein */}
+            <motion.div
+              initial={{ height: 0 }}
+              animate={{ height: "45%" }}
+              transition={{
+                delay: 0.5,
+                duration: 0.5,
+              }}
+              className="absolute bottom-0 w-full bg-[#B36235]"
+            />
+
+            {/* Veggies */}
+            <motion.div
+              initial={{ height: 0 }}
+              animate={{ height: "70%" }}
+              transition={{
+                delay: 1,
+                duration: 0.5,
+              }}
+              className="absolute bottom-0 w-full bg-[#7CB342]"
+            />
+
+            {/* Dressing */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{
+                delay: 1.5,
+                duration: 0.4,
+              }}
+              className="absolute top-3 left-5 right-5 h-2 rounded-full bg-[#E98A15]"
+            />
+
+          </div>
+
+        </div>
+
+        <motion.h2
+          className="font-['Anton'] text-4xl text-[#E2BD87]"
+          animate={{
+            opacity: [0.6, 1, 0.6],
+          }}
+          transition={{
+            repeat: Infinity,
+            duration: 1.5,
+          }}
+        >
+          Building Your Bowl...
+        </motion.h2>
+
+        <motion.p
+          key="status"
+          className="font-['Sora'] text-[#FAF5E4]/80 mt-4 text-sm"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+        >
+          Fresh ingredients are being packed.
+        </motion.p>
+
+      </div>
+    </motion.div>
+  )}
+</AnimatePresence>
         {/* ── CART VIEW ── */}
         <AnimatePresence mode="wait">
           {view === 'cart' && (
