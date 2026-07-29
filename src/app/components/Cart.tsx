@@ -62,6 +62,7 @@ onBuildAnother,
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const grandTotal = bowls.reduce((sum, bowl) => sum + bowl.total, 0);
+  const [isPlacingOrder, setIsPlacingOrder] = useState(false);
 
 // Find selected area's delivery charge
 const selectedArea = DELIVERY_AREAS.find(
@@ -173,8 +174,11 @@ const deleteIngredient = (bowlId: string, itemId: string) => {
     return;
   }
 
-  try {
-    const response = await fetch(`${API_URL}/orders`, {
+try {
+
+  setIsPlacingOrder(true);
+
+  const response = await fetch(`${API_URL}/orders`, {
       method: "POST",
 
       headers: {
@@ -213,16 +217,23 @@ body: JSON.stringify({
 })
     });
 
-    if (!response.ok) {
-      throw new Error("Failed to create order");
-    }
+if (!response.ok) {
+  setIsPlacingOrder(false);
+  throw new Error("Failed to create order");
+}
 
-    setView("success");
+setIsPlacingOrder(false);
+
+setView("success");
 
   } catch (err) {
-    console.error(err);
-    alert("Unable to place order.");
-  }
+
+  setIsPlacingOrder(false);
+
+  console.error(err);
+
+  alert("Unable to place order.");
+}
 };
 
   if (!isOpen) return null;
@@ -245,6 +256,40 @@ body: JSON.stringify({
         exit={{ x: '100%' }}
         transition={{ type: 'spring', damping: 28, stiffness: 300 }}
       >
+         {/* 👇 ADD THE LOADING SCREEN HERE 👇 */}
+
+      <AnimatePresence>
+        {isPlacingOrder && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 z-[999] bg-[#1F3D2B] flex items-center justify-center"
+          >
+            <div className="text-center">
+
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{
+                  repeat: Infinity,
+                  duration: 1,
+                  ease: "linear",
+                }}
+                className="w-16 h-16 border-4 border-[#E2BD87]/20 border-t-[#E98A15] rounded-full mx-auto mb-8"
+              />
+
+              <h2 className="font-['Anton'] text-3xl text-[#E2BD87]">
+                Building Your Bowl...
+              </h2>
+
+              <p className="font-['Sora'] text-[#FAF5E4]/70 mt-3">
+                Please wait while we place your order.
+              </p>
+
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
         {/* ── CART VIEW ── */}
         <AnimatePresence mode="wait">
           {view === 'cart' && (
@@ -519,7 +564,10 @@ body: JSON.stringify({
               </p>
               <div className="text-4xl mb-6">🥗🎉</div>
               <button
-                onClick={handleClose}
+                onClick={() => {
+  if (!isPlacingOrder) handleClose();
+}}
+
                 className="px-8 py-3.5 bg-[#E98A15] hover:bg-[#D07A0E] text-white rounded-full font-['Sora'] font-semibold tracking-wide transition-colors"
               >
                 Back to Home
