@@ -1,0 +1,19 @@
+{
+  "name": "Underground Salad Bar",
+  "short_name": "USB",
+  "theme_color": "#1F3D2B",
+  "background_color": "#FAF5E4",
+  "display": "standalone",
+  "icons": [
+    {
+      "src": "/favicon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    }
+  ]
+}
