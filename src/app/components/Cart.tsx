@@ -63,6 +63,7 @@ onBuildAnother,
 
   const grandTotal = bowls.reduce((sum, bowl) => sum + bowl.total, 0);
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
+  const [confirmedOrderTotal, setConfirmedOrderTotal] = useState<number | null>(null);
 
 // Find selected area's delivery charge
 const selectedArea = DELIVERY_AREAS.find(
@@ -110,7 +111,7 @@ const decreaseScoops = (bowlId: string, itemId: string) => {
           .map(item => {
             if (item.id !== itemId) return item;
 
-            if (item.scoops === 1) {
+            if (item.scoops <= 1) {
               return null;
             }
 
@@ -154,6 +155,7 @@ const deleteIngredient = (bowlId: string, itemId: string) => {
   const handleClose = () => {
     setView('cart');
     setErrors({});
+    setConfirmedOrderTotal(null);
     onClose();
   };
 
@@ -191,39 +193,30 @@ body: JSON.stringify({
   address: form.address,
   area: form.area,
   city: form.city,
-  total: grandTotal,
-
+  // Do not send client prices or totals. The API owns all price calculations.
   bowls: bowls.map((bowl) => ({
-    name: "Build Your Own Bowl",
-    quantity: 1,
-    price: bowl.total,
-
-    details: bowl.items
-      .map((item) => {
-        let text = `${item.category.toUpperCase()}: ${item.name}`;
-
-        if (item.scoops > 1) {
-          text += ` x${item.scoops}`;
-        }
-
-        if (item.veggieSelection?.length) {
-          text += ` (${item.veggieSelection.join(", ")})`;
-        }
-
-        return text;
-      })
-      .join("\n"),
+    items: bowl.items.map((item) => ({
+      name: item.name,
+      category: item.category,
+      scoops: item.scoops,
+      ...(item.veggieSelection ? { veggieSelection: item.veggieSelection } : {}),
+    })),
   })),
 })
     });
 
+const responseData = await response.json().catch(() => null);
 if (!response.ok) {
-  setIsPlacingOrder(false);
-  throw new Error("Failed to create order");
+  throw new Error(responseData?.error || responseData?.message || "Failed to create order");
 }
 
-setIsPlacingOrder(false);
+const serverTotal = Number(responseData?.total);
+if (!Number.isFinite(serverTotal) || serverTotal < 0) {
+  throw new Error("The order was created, but its confirmed total could not be read. Please contact the kitchen before retrying.");
+}
 
+setConfirmedOrderTotal(serverTotal);
+setIsPlacingOrder(false);
 setView("success");
 
   } catch (err) {
@@ -232,7 +225,7 @@ setView("success");
 
   console.error(err);
 
-  alert("Unable to place order.");
+  alert(err instanceof Error ? err.message : "Unable to place order.");
 }
 };
 
@@ -612,6 +605,11 @@ setView("success");
               </motion.div>
               <h3 className="text-[#1F3D2B] mb-3 text-2xl">Congratulations!</h3>
               <p className="font-['Anton'] text-[#E98A15] text-xl mb-3">Your order has been placed.</p>
+              {confirmedOrderTotal !== null && (
+                <p className="font-['Sora'] text-[#1F3D2B] text-sm font-semibold mb-3">
+                  Confirmed order total: ₹{confirmedOrderTotal}
+                </p>
+              )}
               <p className="font-['Sora'] text-[#1A1209]/60 text-sm mb-2 leading-relaxed">
                 Hi {form.name || 'there'}! We'll call you at {form.phone || 'your number'} once your bowl is on the way.
               </p>

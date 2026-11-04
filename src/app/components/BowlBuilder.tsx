@@ -397,14 +397,48 @@ const handleRemoveItem = (itemId: string) => {
   const getItemScoops = (itemName: string) =>
     selectedItems.find(i => i.name === itemName && i.category === currentCategory.id)?.scoops || 0;
 
-const calculateTotal = () =>
-  selectedItems.reduce((sum, i) => sum + i.price * i.scoops, 0);
+const calculateTotal = (items: BowlItem[]) =>
+  items.reduce((sum, item) => sum + item.price * item.scoops, 0);
+
+const getCurrentSelection = () => {
+  if (currentStep !== 2) return selectedItems;
+
+  const currentItems = selectedItems.filter(item => item.category !== 'veggies');
+  if (veggieScoops > 0 && selectedVeggies.length > 0) {
+    currentItems.push({
+      id: 'current-veggie-preview',
+      name: 'Veggie Scoop',
+      category: 'veggies',
+      price: categories[2].pricePerScoop,
+      scoops: veggieScoops,
+      veggieSelection: selectedVeggies,
+    });
+  }
+  return currentItems;
+};
+
+const calculateCurrentTotal = () => calculateTotal(getCurrentSelection());
 
   const saveVeggies = () => {
-    if (currentStep === 2 && veggieScoops > 0 && selectedVeggies.length > 0) {
-      const vi: BowlItem = { id: `veggies-${Date.now()}`, name: 'Veggie Scoop', category: 'veggies', price: 40, scoops: veggieScoops, veggieSelection: selectedVeggies };
-      setSelectedItems(prev => [...prev.filter(i => i.category !== 'veggies'), vi]);
-    }
+    if (currentStep !== 2) return;
+
+    const veggieItem: BowlItem | null = veggieScoops > 0 && selectedVeggies.length > 0
+      ? {
+          id: `veggies-${Date.now()}`,
+          name: 'Veggie Scoop',
+          category: 'veggies',
+          price: 40,
+          scoops: veggieScoops,
+          veggieSelection: selectedVeggies,
+        }
+      : null;
+
+    // Always remove the previous veggie line first, including when the user
+    // clears every selected vegetable before moving to the next step.
+    setSelectedItems(prev => [
+      ...prev.filter(item => item.category !== 'veggies'),
+      ...(veggieItem ? [veggieItem] : []),
+    ]);
   };
 
   const handleNext = () => { saveVeggies(); if (currentStep < categories.length - 1) setCurrentStep(s => s + 1); };
@@ -412,17 +446,29 @@ const calculateTotal = () =>
 
   const handleAddToCart = () => {
     let finalItems = [...selectedItems];
-    if (currentStep === 2 && veggieScoops > 0 && selectedVeggies.length > 0) {
-      finalItems = [...finalItems.filter(i => i.category !== 'veggies'), { id: `veggies-${Date.now()}`, name: 'Veggie Scoop', category: 'veggies', price: 40, scoops: veggieScoops, veggieSelection: selectedVeggies }];
+    if (currentStep === 2) {
+      // Rebuild the veggie line from the current selection so removed veggies
+      // cannot remain in the cart as a stale ingredient line.
+      finalItems = finalItems.filter(item => item.category !== 'veggies');
+      if (veggieScoops > 0 && selectedVeggies.length > 0) {
+        finalItems.push({
+          id: `veggies-${Date.now()}`,
+          name: 'Veggie Scoop',
+          category: 'veggies',
+          price: 40,
+          scoops: veggieScoops,
+          veggieSelection: selectedVeggies,
+        });
+      }
     }
-    if (finalItems.length === 0 && veggieScoops === 0) return;
+    if (finalItems.length === 0) return;
    onClose();
 
 setTimeout(() => {
   onAddToCart({
     id: `bowl-${Date.now()}`,
     items: finalItems,
-    total: calculateTotal(),
+    total: calculateTotal(finalItems),
   });
 
   setSelectedItems([]);
@@ -624,7 +670,7 @@ const handleClose = () => {
             <div className="p-5 bg-white/60 border-t border-[#1A1209]/8">
               <div className="flex items-center justify-between mb-1">
                 <span className="font-['Sora'] text-[#1A1209]/50 text-xs">Bowl total</span>
-                <span className="font-['Anton'] text-[#1F3D2B] text-2xl">₹{calculateTotal()}</span>
+                <span className="font-['Anton'] text-[#1F3D2B] text-2xl">₹{calculateCurrentTotal()}</span>
               </div>
               <p className="font-['Sora'] text-[#1A1209]/40 text-xs">
                 {selectedItems.reduce((s, i) => s + i.scoops, 0) + veggieScoops} scoops selected
@@ -637,7 +683,7 @@ const handleClose = () => {
         <div className="lg:hidden shrink-0 bg-white/80 border-t border-[#1A1209]/8 px-5 py-3 flex items-center justify-between">
           <div>
             <p className="font-['Sora'] text-[#1A1209]/50 text-xs">Bowl total</p>
-            <span className="font-['Anton'] text-[#1F3D2B] text-xl">₹{calculateTotal()}</span>
+            <span className="font-['Anton'] text-[#1F3D2B] text-xl">₹{calculateCurrentTotal()}</span>
           </div>
           <span className="font-['Sora'] text-[#1A1209]/40 text-xs">
             {selectedItems.reduce((s, i) => s + i.scoops, 0) + veggieScoops} scoops
@@ -661,7 +707,7 @@ const handleClose = () => {
           ) : (
             <button onClick={handleAddToCart} disabled={selectedItems.length === 0 && veggieScoops === 0}
               className="flex-1 py-3.5 bg-[#E98A15] hover:bg-[#D07A0E] text-white rounded-full font-['Sora'] text-sm font-semibold tracking-wide transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
-              Add to Cart · ₹{calculateTotal()}
+              Add to Cart · ₹{calculateCurrentTotal()}
             </button>
           )}
         </div>

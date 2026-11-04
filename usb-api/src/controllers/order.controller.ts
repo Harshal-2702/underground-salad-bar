@@ -1,193 +1,158 @@
 import type { Request, Response } from "express";
+import { OrderStatus } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
+import { calculateOrderPricing, PricingValidationError } from "../services/pricing.js";
 import { sendTelegramMessage } from "../services/telegram.service.js";
+import { createOrderDeliverySnapshot } from "../services/order-delivery.js";
 
-console.log("🔥 ORDER CONTROLLER FILE LOADED");
+function isOrderStatus(value: unknown): value is OrderStatus {
+  return Object.values(OrderStatus).includes(value as OrderStatus);
+}
+
+function isText(value: unknown, maxLength: number): value is string {
+  return typeof value === "string" && value.trim().length > 0 && value.trim().length <= maxLength;
+}
+
+function escapeHtml(value: string): string {
+  const replacements: Record<string, string> = {
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+  };
+  return value.replace(/[&<>"']/g, (character) => replacements[character]);
+}
 
 export async function createOrder(req: Request, res: Response) {
-  console.log("STEP 1 - createOrder called");
-
   try {
-    console.log("STEP 2 - Request received");
-    console.log(JSON.stringify(req.body, null, 2));
+    const body = req.body ?? {};
+    const { customerName, phone, address, area, city, bowls } = body;
 
-    const {
+    if (!isText(customerName, 100) || !isText(phone, 10) || !/^[6-9]\d{9}$/.test(phone.trim()) ||
+        !isText(address, 500) || !isText(area, 80) || !isText(city, 40) || city.trim().toLowerCase() !== "pune") {
+      return res.status(400).json({ error: "Please provide valid customer and delivery details." });
+    }
+
+    // All ingredient prices, bowl totals, delivery charges and final totals are
+    // recalculated from the server-owned catalogue. Client prices/totals are ignored.
+    const pricing = calculateOrderPricing(bowls, area.trim());
+    const deliverySnapshot = createOrderDeliverySnapshot({
       customerName,
       phone,
       address,
       area,
-      city,
-      total,
-      bowls,
-    } = req.body;
-
-    console.log("STEP 3 - Body parsed");
-
-    if (!customerName || !phone || !address || !area || !city) {
-      console.log("❌ Missing customer details");
-
-      return res.status(400).json({
-        error: "Missing customer details",
-      });
-    }
-
-    if (!Array.isArray(bowls) || bowls.length === 0) {
-      console.log("❌ No bowls received");
-
-      return res.status(400).json({
-        error: "No bowls received",
-      });
-    }
-
-    console.log("STEP 4 - Validation passed");
-
+    });
+    const canonicalArea = deliverySnapshot.deliveryArea;
+    const canonicalCity = deliverySnapshot.deliveryCity;
     const invoiceNumber = `USB-${Date.now()}`;
-
-    console.log("STEP 5 - Creating Prisma Order");
 
     const order = await prisma.order.create({
       data: {
         invoiceNumber,
-        total: Number(total),
+        ...deliverySnapshot,
+        total: pricing.total,
+        deliveryCharge: pricing.deliveryCharge,
         paymentMethod: "COD",
-
         customer: {
           connectOrCreate: {
-            where: {
-              phone,
-            },
+            where: { phone: phone.trim() },
             create: {
-              name: customerName,
-              phone,
-              address,
-              area,
-              city,
+              name: customerName.trim(),
+              phone: phone.trim(),
+              address: address.trim(),
+              area: canonicalArea,
+              city: canonicalCity,
             },
           },
         },
-
         bowls: {
-          create: bowls.map((b: any) => ({
-            bowlName: b.name,
-            quantity: b.quantity,
-            price: b.price,
-            details: b.details,
-          })),
+          create: pricing.bowls,
         },
       },
-
       include: {
         customer: true,
         bowls: true,
       },
     });
 
-    console.log("✅ STEP 6 - Order saved");
-    console.log(order);
-
     const message = `
 🥗 <b>NEW ORDER RECEIVED</b>
 
-🧾 <b>Invoice:</b> ${order.invoiceNumber}
+🧾 <b>Invoice:</b> ${escapeHtml(order.invoiceNumber)}
 
-👤 <b>Customer:</b> ${order.customer.name}
+👤 <b>Customer:</b> ${escapeHtml(deliverySnapshot.deliveryName)}
 
-📞 <b>Phone:</b> ${order.customer.phone}
+📞 <b>Phone:</b> ${escapeHtml(deliverySnapshot.deliveryPhone)}
 
-📍 <b>Area:</b> ${order.customer.area}
+📍 <b>Area:</b> ${escapeHtml(deliverySnapshot.deliveryArea)}
 
 🏠 <b>Address:</b>
-${order.customer.address}
+${escapeHtml(deliverySnapshot.deliveryAddress)}
 
-💰 <b>Total:</b> ₹${order.total}
+🧺 <b>Items subtotal:</b> ₹${pricing.itemsSubtotal}
+🚚 <b>Delivery:</b> ₹${order.deliveryCharge}
+💰 <b>Total payable:</b> ₹${order.total}
 
 ━━━━━━━━━━━━━━━━━━
 
 ${order.bowls
-  .map(
-    (b, index) => `
-🍽 <b>Bowl ${index + 1}</b>
-
-${b.details ?? "No details"}
-`
-  )
-  .join("\n")}
+  .map((bowl, index) => `🍽 <b>Bowl ${index + 1} — ₹${bowl.price}</b>\n${escapeHtml(bowl.details ?? "No details")}`)
+  .join("\n\n")}
 `;
 
-    console.log("STEP 7 - Telegram message created");
-
     try {
-      console.log("📨 Sending Telegram...");
-
       await sendTelegramMessage(message);
-
-      console.log("✅ Telegram Sent");
-    } catch (telegramError) {
-      console.error("❌ Telegram Failed");
-      console.error(telegramError);
-
-      // Don't stop the order if Telegram fails
+    } catch {
+      // The order is already saved; notification failure must not undo it.
+      console.error("Telegram notification failed; the order remains saved.");
     }
 
-    console.log("STEP 8 - Returning response");
+    return res.status(201).json(order);
+  } catch (error) {
+    if (error instanceof PricingValidationError) {
+      return res.status(400).json({ error: error.message });
+    }
 
-    return res.json(order);
-  } catch (err: any) {
-    console.error("========== CREATE ORDER ERROR ==========");
-    console.error(err);
-    console.error(err?.message);
-    console.error(err?.stack);
-    console.error("========================================");
-
-    return res.status(500).json({
-      message: err?.message,
-      code: err?.code,
-      meta: err?.meta,
+    console.error("Order creation failed", {
+      name: (error as any)?.name,
+      code: (error as any)?.code,
     });
+
+    return res.status(500).json({ message: "Unable to place your order. Please try again." });
   }
 }
 
-export async function getOrders(
-  req: Request,
-  res: Response
-) {
+export async function getOrders(_req: Request, res: Response) {
   const orders = await prisma.order.findMany({
-    orderBy: {
-      createdAt: "desc",
-    },
-    include: {
-      customer: true,
-      bowls: true,
-    },
+    orderBy: { createdAt: "desc" },
+    include: { customer: true, bowls: true },
   });
 
   res.json(orders);
 }
 
-export async function updateOrderStatus(
-  req: Request,
-  res: Response
-) {
+export async function updateOrderStatus(req: Request, res: Response) {
   try {
     const { id } = req.params as { id: string };
+    const { status } = req.body ?? {};
 
-    const { status } = req.body;
+    if (!isOrderStatus(status)) {
+      return res.status(400).json({ error: "Invalid order status." });
+    }
 
     const order = await prisma.order.update({
-      where: {
-        id,
-      },
-      data: {
-        status,
-      },
+      where: { id },
+      data: { status },
     });
 
-    res.json(order);
+    return res.json(order);
   } catch (error) {
-    console.error(error);
-
-    res.status(500).json({
-      error: "Unable to update order",
+    console.error("Order status update failed", {
+      name: (error as any)?.name,
+      code: (error as any)?.code,
     });
+
+    return res.status(500).json({ error: "Unable to update order. Please try again." });
   }
 }

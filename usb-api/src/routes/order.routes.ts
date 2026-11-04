@@ -1,24 +1,18 @@
 import { Router } from "express";
-
-console.log("🔥 ROUTES FILE LOADED");
-
 import {
   createOrder,
   getOrders,
   updateOrderStatus,
 } from "../controllers/order.controller.js";
-
-console.log("createOrder =", createOrder);
+import { requireAdmin } from "../middleware/requireAdmin.js";
 
 const router = Router();
 
-router.post("/", async (req, res) => {
-  console.log("🔥 ROUTE HIT");
-  await createOrder(req, res);
-});
+// Public customer checkout. Prices are recalculated and validated by the API.
+router.post("/", createOrder);
 
-router.get("/", getOrders);
-
-router.patch("/:id/status", updateOrderStatus);
+// Staff-only endpoints: customer/order data must never be publicly readable.
+router.get("/", requireAdmin, getOrders);
+router.patch("/:id/status", requireAdmin, updateOrderStatus);
 
 export default router;

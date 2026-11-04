@@ -21,9 +21,19 @@ model Customer {
 }
 
 model Order {
-  id            String      @id @default(cuid())
-  invoiceNumber String      @unique
-  total         Float
+  id             String      @id @default(cuid())
+  invoiceNumber  String      @unique
+  total          Float
+  deliveryCharge Float?
+
+  // Immutable checkout-time delivery details. Nullable for historical orders
+  // created before order-level delivery snapshots were introduced.
+  deliveryName    String?
+  deliveryPhone   String?
+  deliveryAddress String?     @db.Text
+  deliveryArea    String?
+  deliveryCity    String?
+
   paymentMethod String
   status        OrderStatus @default(PENDING)
 

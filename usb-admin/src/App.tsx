@@ -1,5 +1,58 @@
 import OrdersPage from "../pages/OrdersPage";
+import { AuthProvider, useAuth } from "./auth/AuthContext";
+import LoginPage from "./auth/LoginPage";
+import SetPasswordPage from "./auth/SetPasswordPage";
+import { isSupabaseConfigured } from "./lib/supabase";
+import "./auth/auth-extra.css";
+
+function AdminGate() {
+  const { session, loading, passwordRecovery, signOut } = useAuth();
+
+  if (!isSupabaseConfigured) {
+    return (
+      <main className="auth-shell">
+        <section className="auth-card">
+          <h1>Admin configuration required</h1>
+          <p className="auth-description">
+            Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to usb-admin/.env.local, then restart the admin app.
+          </p>
+        </section>
+      </main>
+    );
+  }
+
+  if (loading) {
+    return <main className="auth-shell"><p>Checking staff session…</p></main>;
+  }
+
+  if (passwordRecovery) {
+    if (session) return <SetPasswordPage />;
+    return (
+      <main className="auth-shell">
+        <section className="auth-card">
+          <h1>Password link not active</h1>
+          <p className="auth-description">The password link may have expired or already been used. Return to login and request a new password email.</p>
+          <a href="/" className="auth-link">Return to login</a>
+        </section>
+      </main>
+    );
+  }
+
+  if (!session) return <LoginPage />;
+
+  return (
+    <OrdersPage
+      accessToken={session.access_token}
+      signedInEmail={session.user.email ?? "Staff"}
+      onSignOut={signOut}
+    />
+  );
+}
 
 export default function App() {
-  return <OrdersPage />;
+  return (
+    <AuthProvider>
+      <AdminGate />
+    </AuthProvider>
+  );
 }

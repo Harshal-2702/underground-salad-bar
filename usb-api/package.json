@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
-    "start": "node dist/server.js"
+    "start": "node dist/server.js",
+    "test": "node --import tsx --test src/services/pricing.test.ts src/services/order-delivery.test.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
@@ -21,8 +22,10 @@
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/node": "^26.1.0",
-    "ts-node-dev": "^2.0.0",
     "tsx": "^4.23.0",
     "typescript": "^6.0.3"
+  },
+  "overrides": {
+    "deepmerge-ts": "8.0.2"
   }
 }
