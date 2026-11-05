@@ -21,14 +21,24 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-function isPasswordResetUrl() {
-  return new URLSearchParams(window.location.search).get("mode") === "reset";
+function isPasswordSetupUrl() {
+  const query = new URLSearchParams(window.location.search);
+  const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+  const linkType = query.get("type") ?? hash.get("type");
+
+  // Supabase invite links return type=invite in the URL fragment.
+  // Password reset links use mode=reset (our explicit redirect) or type=recovery.
+  return (
+    query.get("mode") === "reset" ||
+    linkType === "invite" ||
+    linkType === "recovery"
+  );
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const [passwordRecovery, setPasswordRecovery] = useState(isPasswordResetUrl);
+  const [passwordRecovery, setPasswordRecovery] = useState(isPasswordSetupUrl);
 
   useEffect(() => {
     if (!supabase) {
@@ -43,7 +53,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } = supabase.auth.onAuthStateChange((event, nextSession) => {
       if (!mounted) return;
       setSession(nextSession);
-      if (event === "PASSWORD_RECOVERY" || isPasswordResetUrl()) {
+      if (event === "PASSWORD_RECOVERY" || isPasswordSetupUrl()) {
         setPasswordRecovery(true);
       }
       setLoading(false);
