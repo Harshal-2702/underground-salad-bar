@@ -44,6 +44,8 @@ export const requireAdmin: RequestHandler = async (req, res, next) => {
       return;
     }
 
+    // Controllers use this verified Supabase identity for immutable kitchen audit events.
+    res.locals.adminEmail = email;
     next();
   } catch {
     // Do not log access tokens or return provider internals to the browser.
