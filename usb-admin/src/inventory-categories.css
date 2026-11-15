@@ -1,0 +1,109 @@
+.inventory-category-manager {
+  margin: 0 0 22px;
+  padding: 20px 22px;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  background: #fff;
+}
+.inventory-category-manager-heading,
+.inventory-category-item,
+.inventory-category-item-actions,
+.inventory-category-form-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+.inventory-category-manager-heading h2 {
+  margin: 5px 0 4px;
+  font-size: 18px;
+}
+.inventory-category-manager-heading p,
+.inventory-category-form > div:first-child p {
+  margin: 0;
+  color: #6b7280;
+  font-size: 13px;
+}
+.inventory-category-manager-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 0.9fr);
+  gap: 20px;
+  margin-top: 18px;
+}
+.inventory-category-list {
+  min-width: 0;
+}
+.inventory-category-item {
+  padding: 12px 0;
+  border-bottom: 1px solid #edf0f2;
+}
+.inventory-category-item:first-child {
+  border-top: 1px solid #edf0f2;
+}
+.inventory-category-item > div:first-child {
+  display: grid;
+  gap: 3px;
+}
+.inventory-category-item > div:first-child strong {
+  font-size: 14px;
+}
+.inventory-category-item > div:first-child span {
+  color: #6b7280;
+  font-size: 12px;
+}
+.inventory-category-item-actions {
+  justify-content: flex-end;
+  flex-shrink: 0;
+}
+.inventory-category-form {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid #edf0f2;
+  border-radius: 12px;
+  background: #fafbfc;
+}
+.inventory-category-form h3 {
+  margin: 0 0 4px;
+  font-size: 15px;
+}
+.inventory-category-form-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.inventory-category-form-fields label {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.inventory-category-form-fields label:last-child {
+  grid-column: 1 / -1;
+}
+.inventory-category-form-fields input {
+  width: 100%;
+  min-width: 0;
+}
+.inventory-category-form-actions {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+.catalogue-purchasing-category {
+  display: block;
+  margin-top: 3px;
+  color: #6b7280;
+  font-size: 11px;
+}
+@media (max-width: 760px) {
+  .inventory-category-manager { padding: 16px; }
+  .inventory-category-manager-heading { align-items: flex-start; flex-direction: column; }
+  .inventory-category-manager-body { grid-template-columns: 1fr; }
+}
+@media (max-width: 420px) {
+  .inventory-category-form-fields { grid-template-columns: 1fr; }
+  .inventory-category-form-fields label:last-child { grid-column: auto; }
+  .inventory-category-item { align-items: flex-start; }
+  .inventory-category-item-actions { flex-direction: column; align-items: flex-end; gap: 6px; }
+}
