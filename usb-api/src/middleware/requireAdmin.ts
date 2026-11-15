@@ -44,6 +44,8 @@ export const requireAdmin: RequestHandler = async (req, res, next) => {
       return;
     }
 
+    // Expose the verified staff identity to audited purchase operations.
+    res.locals.adminEmail = email;
     next();
   } catch {
     // Do not log access tokens or return provider internals to the browser.

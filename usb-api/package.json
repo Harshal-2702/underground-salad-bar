@@ -7,7 +7,7 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
-    "test": "node --import tsx --test src/services/pricing.test.ts src/services/order-delivery.test.ts"
+    "test": "node --import tsx --test src/services/pricing.test.ts src/services/order-delivery.test.ts src/services/ingredient-validation.test.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
