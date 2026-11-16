@@ -161,6 +161,22 @@ model KotChannelTimingSetting {
 // INGREDIENT CATALOGUE + UNIT MANAGEMENT — v0.3
 // ============================================================
 
+model InventoryCategory {
+  id        String   @id @default(cuid())
+  code      String   @unique @db.VarChar(40)
+  name      String   @db.VarChar(100)
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now()) @db.Timestamp(3)
+  updatedAt DateTime @updatedAt @db.Timestamp(3)
+
+  ingredients Ingredient[]
+  purchaseSheets PurchaseSheet[]
+
+  @@index([isActive, sortOrder])
+  @@index([name])
+}
+
 model IngredientCategory {
   id          String   @id @default(cuid())
   code        String   @unique @db.VarChar(40)
@@ -191,6 +207,7 @@ model Unit {
   ingredientsAsBaseUnit      Ingredient[]               @relation("IngredientBaseUnit")
   ingredientsAsPurchaseUnit  Ingredient[]               @relation("IngredientDefaultPurchaseUnit")
   ingredientUnitConversions  IngredientUnitConversion[]
+  purchaseLines              PurchaseLine[]
   recipeVersionsAsOutputUnit RecipeVersion[]            @relation("RecipeVersionOutputUnit")
   recipeIngredientLines      RecipeIngredientLine[]
 
@@ -205,6 +222,7 @@ model Ingredient {
   name                  String   @db.VarChar(160)
   description           String?  @db.Text
   categoryId            String?
+  inventoryCategoryId   String?
   baseUnitId            String
   defaultPurchaseUnitId String?
   isStockTracked        Boolean  @default(true)
@@ -214,14 +232,17 @@ model Ingredient {
   updatedAt             DateTime @updatedAt @db.Timestamp(3)
 
   category            IngredientCategory? @relation(fields: [categoryId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  inventoryCategory   InventoryCategory?  @relation(fields: [inventoryCategoryId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   baseUnit            Unit                @relation("IngredientBaseUnit", fields: [baseUnitId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   defaultPurchaseUnit Unit?               @relation("IngredientDefaultPurchaseUnit", fields: [defaultPurchaseUnitId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
   unitConversions IngredientUnitConversion[]
   allergens       IngredientAllergen[]
+  purchaseLines   PurchaseLine[]
   recipeLines     RecipeIngredientLine[]
 
   @@index([categoryId, isActive])
+  @@index([inventoryCategoryId, isActive])
   @@index([baseUnitId])
   @@index([defaultPurchaseUnitId])
   @@index([name])
@@ -418,4 +439,88 @@ model RecipeStep {
 
   @@unique([recipeVersionId, stepNumber])
   @@index([recipeVersionId])
+}
+
+model PurchaseDraft {
+  id             String   @id @default(cuid())
+  ownerEmail     String   @unique @db.VarChar(255)
+  createdByEmail String   @db.VarChar(255)
+  updatedByEmail String   @db.VarChar(255)
+  data           Json     @db.JsonB
+  createdAt      DateTime @default(now()) @db.Timestamp(3)
+  updatedAt      DateTime @updatedAt @db.Timestamp(3)
+
+  @@index([updatedAt])
+}
+
+model PurchaseTransaction {
+  id             String   @id @default(cuid())
+  reference      String   @unique @db.VarChar(40)
+  recordedByEmail String  @db.VarChar(255)
+  recordedByName  String  @db.VarChar(120)
+  totalAmount    Decimal  @db.Decimal(18, 2)
+  createdAt      DateTime @default(now()) @db.Timestamp(3)
+  voidedAt       DateTime? @db.Timestamp(3)
+  voidedByEmail  String?  @db.VarChar(255)
+  voidReason     String?  @db.Text
+
+  sheets PurchaseSheet[]
+
+  @@index([createdAt])
+  @@index([recordedByEmail])
+  @@index([voidedAt, createdAt])
+  @@index([totalAmount])
+}
+
+model PurchaseSheet {
+  id                            String   @id @default(cuid())
+  transactionId                 String
+  inventoryCategoryId           String
+  inventoryCategoryCodeSnapshot String   @db.VarChar(40)
+  inventoryCategoryNameSnapshot String   @db.VarChar(100)
+  purchaseDate                  DateTime @db.Date
+  supplierName                  String   @db.VarChar(160)
+  invoiceNumber                 String?  @db.VarChar(120)
+  createdAt                     DateTime @default(now()) @db.Timestamp(3)
+
+  transaction       PurchaseTransaction @relation(fields: [transactionId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  inventoryCategory InventoryCategory   @relation(fields: [inventoryCategoryId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  lines             PurchaseLine[]
+
+  @@unique([transactionId, inventoryCategoryId])
+  @@index([purchaseDate])
+  @@index([supplierName])
+  @@index([invoiceNumber])
+  @@index([inventoryCategoryId, purchaseDate])
+}
+
+model PurchaseLine {
+  id                         String   @id @default(cuid())
+  sheetId                    String
+  ingredientId               String
+  purchaseUnitId             String
+  ingredientCodeSnapshot     String   @db.VarChar(64)
+  ingredientNameSnapshot     String   @db.VarChar(160)
+  purchaseUnitCodeSnapshot   String   @db.VarChar(32)
+  purchaseUnitNameSnapshot   String   @db.VarChar(80)
+  purchaseUnitSymbolSnapshot String   @db.VarChar(16)
+  quantity                   Decimal  @db.Decimal(18, 6)
+  itemAmount                 Decimal  @db.Decimal(18, 2)
+  sortOrder                  Int      @default(0)
+  createdAt                  DateTime @default(now()) @db.Timestamp(3)
+
+  sheet        PurchaseSheet @relation(fields: [sheetId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  ingredient   Ingredient    @relation(fields: [ingredientId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  purchaseUnit Unit          @relation(fields: [purchaseUnitId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([sheetId, sortOrder])
+  @@index([ingredientId])
+  @@index([purchaseUnitId])
+  @@index([ingredientNameSnapshot])
+}
+
+model PurchaseDailySequence {
+  businessDate DateTime @id @db.Date
+  lastSequence Int
+  updatedAt    DateTime @default(now()) @updatedAt @db.Timestamp(3)
 }

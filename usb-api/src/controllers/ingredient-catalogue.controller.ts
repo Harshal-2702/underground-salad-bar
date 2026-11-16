@@ -1,4 +1,4 @@
-﻿import { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import type { Request, RequestHandler } from "express";
 
 import {
@@ -179,6 +179,7 @@ function createIngredientInput(body: JsonObject) {
     sku: optionalString(body, "sku", 80, true),
     description: optionalString(body, "description", 10000, true),
     categoryId: optionalString(body, "categoryId", 128, true),
+    inventoryCategoryId: optionalString(body, "inventoryCategoryId", 128, true),
     defaultPurchaseUnitId: optionalString(
       body,
       "defaultPurchaseUnitId",
@@ -210,6 +211,9 @@ function updateIngredientInput(body: JsonObject) {
       : {}),
     ...(body.categoryId !== undefined
       ? { categoryId: optionalString(body, "categoryId", 128, true) }
+      : {}),
+    ...(body.inventoryCategoryId !== undefined
+      ? { inventoryCategoryId: optionalString(body, "inventoryCategoryId", 128, true) }
       : {}),
     ...(body.defaultPurchaseUnitId !== undefined
       ? {
