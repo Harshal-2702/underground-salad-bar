@@ -21,8 +21,14 @@ model Customer {
 }
 
 model Order {
-  id             String      @id @default(cuid())
-  invoiceNumber  String      @unique
+  id             String @id @default(cuid())
+  invoiceNumber  String @unique
+  channel        OrderChannel @default(WEBSITE)
+  externalOrderId String? @db.VarChar(120)
+  kotNumber      String @unique @db.VarChar(40)
+  kotBusinessDate DateTime @db.Date
+  kotSequence    Int
+  specialInstructions String? @db.Text
   total          Float
   deliveryCharge Float?
 
@@ -30,32 +36,46 @@ model Order {
   // created before order-level delivery snapshots were introduced.
   deliveryName    String?
   deliveryPhone   String?
-  deliveryAddress String?     @db.Text
+  deliveryAddress String? @db.Text
   deliveryArea    String?
   deliveryCity    String?
 
   paymentMethod String
   status        OrderStatus @default(PENDING)
 
+  // Persisted KOT stage timestamps and durations. createdAt is the receivedAt timestamp.
+  acceptedAt                 DateTime? @db.Timestamp(3)
+  readyAt                    DateTime? @db.Timestamp(3)
+  handedOverAt               DateTime? @db.Timestamp(3)
+  cancelledAt                DateTime? @db.Timestamp(3)
+  acceptanceDurationSeconds  Int?
+  preparationDurationSeconds Int?
+
   createdAt DateTime @default(now())
 
-  customerId String
-  customer   Customer @relation(fields: [customerId], references: [id])
+  customerId String?
+  customer   Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
 
-  bowls OrderBowl[]
+  bowls        OrderBowl[]
+  statusEvents OrderStatusEvent[]
+
+  @@unique([channel, externalOrderId])
+  @@unique([kotBusinessDate, kotSequence])
+  @@index([createdAt, channel])
+  @@index([kotBusinessDate, status])
 }
 
 model OrderBowl {
-  id       String @id @default(cuid())
+  id String @id @default(cuid())
 
   bowlName String
   quantity Int
   price    Float
 
-  details  String? @db.Text
+  details String? @db.Text
 
   orderId String
-  order   Order @relation(fields: [orderId], references: [id])
+  order   Order  @relation(fields: [orderId], references: [id])
 }
 
 model Subscription {
@@ -77,19 +97,69 @@ enum OrderStatus {
   CANCELLED
 }
 
-enum UnitDimension {
-  MASS
-  VOLUME
-  COUNT
-  PORTION
-  PACKAGE
+enum OrderChannel {
+  WEBSITE
+  ZOMATO
+  SWIGGY
 }
 
-enum AllergenPresence {
-  CONTAINS
-  MAY_CONTAIN
-  CROSS_CONTACT_RISK
+model KotDailySequence {
+  businessDate DateTime @id @db.Date
+  lastSequence Int
+  updatedAt DateTime @default(now()) @updatedAt @db.Timestamp(3)
 }
+
+model OrderStatusEvent {
+  id         String      @id @default(cuid())
+  orderId    String
+  fromStatus OrderStatus?
+  toStatus   OrderStatus
+  actorEmail String?     @db.VarChar(255)
+  createdAt  DateTime    @default(now()) @db.Timestamp(3)
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([orderId, createdAt])
+}
+
+model KotTemplate {
+  id        String   @id @default(cuid())
+  code      String   @unique @db.VarChar(40)
+  name      String   @db.VarChar(120)
+  createdAt DateTime @default(now()) @db.Timestamp(3)
+  updatedAt DateTime @updatedAt @db.Timestamp(3)
+
+  versions KotTemplateVersion[]
+}
+
+model KotTemplateVersion {
+  id            String   @id @default(cuid())
+  templateId    String
+  versionNumber Int
+  config        Json     @db.JsonB
+  isActive      Boolean  @default(false)
+  createdByEmail String? @db.VarChar(255)
+  createdAt     DateTime @default(now()) @db.Timestamp(3)
+
+  template KotTemplate @relation(fields: [templateId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([templateId, versionNumber])
+  @@index([templateId, isActive])
+}
+
+model KotChannelTimingSetting {
+  channel                    OrderChannel @id
+  acceptanceAmberMinutes     Int?
+  acceptanceLateMinutes      Int?
+  preparationAmberMinutes   Int?
+  preparationLateMinutes    Int?
+  updatedByEmail             String?      @db.VarChar(255)
+  updatedAt                  DateTime     @default(now()) @updatedAt @db.Timestamp(3)
+}
+
+// ============================================================
+// INGREDIENT CATALOGUE + UNIT MANAGEMENT — v0.3
+// ============================================================
 
 model InventoryCategory {
   id        String   @id @default(cuid())
@@ -134,10 +204,12 @@ model Unit {
   createdAt         DateTime      @default(now()) @db.Timestamp(3)
   updatedAt         DateTime      @updatedAt @db.Timestamp(3)
 
-  ingredientsAsBaseUnit     Ingredient[]               @relation("IngredientBaseUnit")
-  ingredientsAsPurchaseUnit Ingredient[]               @relation("IngredientDefaultPurchaseUnit")
-  ingredientUnitConversions IngredientUnitConversion[]
-  purchaseLines             PurchaseLine[]
+  ingredientsAsBaseUnit      Ingredient[]               @relation("IngredientBaseUnit")
+  ingredientsAsPurchaseUnit  Ingredient[]               @relation("IngredientDefaultPurchaseUnit")
+  ingredientUnitConversions  IngredientUnitConversion[]
+  purchaseLines              PurchaseLine[]
+  recipeVersionsAsOutputUnit RecipeVersion[]            @relation("RecipeVersionOutputUnit")
+  recipeIngredientLines      RecipeIngredientLine[]
 
   @@index([dimension, isActive])
   @@index([name])
@@ -160,13 +232,14 @@ model Ingredient {
   updatedAt             DateTime @updatedAt @db.Timestamp(3)
 
   category            IngredientCategory? @relation(fields: [categoryId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  inventoryCategory   InventoryCategory? @relation(fields: [inventoryCategoryId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  inventoryCategory   InventoryCategory?  @relation(fields: [inventoryCategoryId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   baseUnit            Unit                @relation("IngredientBaseUnit", fields: [baseUnitId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   defaultPurchaseUnit Unit?               @relation("IngredientDefaultPurchaseUnit", fields: [defaultPurchaseUnitId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
   unitConversions IngredientUnitConversion[]
   allergens       IngredientAllergen[]
   purchaseLines   PurchaseLine[]
+  recipeLines     RecipeIngredientLine[]
 
   @@index([categoryId, isActive])
   @@index([inventoryCategoryId, isActive])
@@ -216,6 +289,156 @@ model IngredientAllergen {
 
   @@id([ingredientId, allergenId])
   @@index([allergenId])
+}
+
+enum UnitDimension {
+  MASS
+  VOLUME
+  COUNT
+  PORTION
+  PACKAGE
+}
+
+enum AllergenPresence {
+  CONTAINS
+  MAY_CONTAIN
+  CROSS_CONTACT_RISK
+}
+
+enum RecipeType {
+  PREPARATION
+  MENU_ITEM
+  BOWL_COMPONENT
+}
+
+enum RecipeVersionStatus {
+  DRAFT
+  PUBLISHED
+  SUPERSEDED
+  ARCHIVED
+}
+
+model Recipe {
+  id          String     @id @default(cuid())
+  code        String     @unique @db.VarChar(64)
+  name        String     @db.VarChar(160)
+  recipeType  RecipeType
+  description String?    @db.Text
+  isActive    Boolean    @default(true)
+  createdAt   DateTime   @default(now()) @db.Timestamp(3)
+  updatedAt   DateTime   @updatedAt @db.Timestamp(3)
+
+  versions RecipeVersion[]
+
+  @@index([recipeType, isActive])
+  @@index([name])
+}
+
+model RecipeVersion {
+  id            String              @id @default(cuid())
+  recipeId      String
+  versionNumber Int
+  status        RecipeVersionStatus @default(DRAFT)
+
+  // Immutable identity snapshots for this version.
+  recipeCodeSnapshot String @db.VarChar(64)
+  recipeNameSnapshot String @db.VarChar(160)
+
+  recipeTypeSnapshot       RecipeType
+  // Expected output for one production batch.
+  outputQuantity           Decimal    @db.Decimal(18, 6)
+  outputUnitId             String
+  outputUnitCodeSnapshot   String     @db.VarChar(32)
+  outputUnitNameSnapshot   String     @db.VarChar(80)
+  outputUnitSymbolSnapshot String     @db.VarChar(16)
+  yieldNotes               String?    @db.Text
+
+  changeSummary String?   @db.Text
+  publishedAt   DateTime? @db.Timestamp(3)
+  archivedAt    DateTime? @db.Timestamp(3)
+  createdAt     DateTime  @default(now()) @db.Timestamp(3)
+  updatedAt     DateTime  @updatedAt @db.Timestamp(3)
+
+  recipe     Recipe @relation(fields: [recipeId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  outputUnit Unit   @relation("RecipeVersionOutputUnit", fields: [outputUnitId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  ingredientLines RecipeIngredientLine[]
+  subrecipeLines  RecipeSubrecipeLine[]  @relation("RecipeVersionSubrecipeLines")
+  usedAsSubrecipe RecipeSubrecipeLine[]  @relation("RecipeSubrecipeComponentVersion")
+  steps           RecipeStep[]
+
+  @@unique([recipeId, versionNumber])
+  @@index([recipeId, status])
+  @@index([outputUnitId])
+}
+
+model RecipeIngredientLine {
+  id              String @id @default(cuid())
+  recipeVersionId String
+  ingredientId    String
+  unitId          String
+
+  // Quantity is expressed in the ingredient's base unit.
+  quantity Decimal @db.Decimal(18, 6)
+
+  // Historical display snapshots.
+  ingredientCodeSnapshot String @db.VarChar(64)
+  ingredientNameSnapshot String @db.VarChar(160)
+  unitCodeSnapshot       String @db.VarChar(32)
+  unitNameSnapshot       String @db.VarChar(80)
+  unitSymbolSnapshot     String @db.VarChar(16)
+
+  sortOrder Int      @default(0)
+  notes     String?  @db.Text
+  createdAt DateTime @default(now()) @db.Timestamp(3)
+
+  recipeVersion RecipeVersion @relation(fields: [recipeVersionId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  ingredient    Ingredient    @relation(fields: [ingredientId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  unit          Unit          @relation(fields: [unitId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([recipeVersionId, sortOrder])
+  @@index([ingredientId])
+  @@index([unitId])
+}
+
+model RecipeSubrecipeLine {
+  id                       String @id @default(cuid())
+  recipeVersionId          String
+  componentRecipeVersionId String
+
+  // Quantity is expressed in the referenced sub-recipe's output unit.
+  quantity Decimal @db.Decimal(18, 6)
+
+  componentRecipeCodeSnapshot       String @db.VarChar(64)
+  componentRecipeNameSnapshot       String @db.VarChar(160)
+  componentVersionNumberSnapshot    Int
+  componentOutputUnitCodeSnapshot   String @db.VarChar(32)
+  componentOutputUnitNameSnapshot   String @db.VarChar(80)
+  componentOutputUnitSymbolSnapshot String @db.VarChar(16)
+
+  sortOrder Int      @default(0)
+  notes     String?  @db.Text
+  createdAt DateTime @default(now()) @db.Timestamp(3)
+
+  recipeVersion          RecipeVersion @relation("RecipeVersionSubrecipeLines", fields: [recipeVersionId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  componentRecipeVersion RecipeVersion @relation("RecipeSubrecipeComponentVersion", fields: [componentRecipeVersionId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([recipeVersionId, sortOrder])
+  @@index([componentRecipeVersionId])
+}
+
+model RecipeStep {
+  id              String  @id @default(cuid())
+  recipeVersionId String
+  stepNumber      Int
+  title           String? @db.VarChar(160)
+  instruction     String  @db.Text
+  timerSeconds    Int?
+
+  recipeVersion RecipeVersion @relation(fields: [recipeVersionId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([recipeVersionId, stepNumber])
+  @@index([recipeVersionId])
 }
 
 model PurchaseDraft {

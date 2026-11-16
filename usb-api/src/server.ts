@@ -9,6 +9,8 @@ import {
   categoryRouter,
   allergenRouter,
 } from "./routes/ingredient-catalogue.routes.js";
+import { recipeRouter } from "./routes/recipe.routes.js";
+import kotRoutes from "./routes/kot.routes.js";
 import { inventoryCategoryRouter } from "./routes/inventory-category.routes.js";
 import { purchaseRouter } from "./routes/purchase.routes.js";
 
@@ -59,13 +61,15 @@ app.get("/health", (_req, res) => {
 // Public customer checkout; staff order endpoints require authentication.
 app.use("/orders", orderRoutes);
 
-// Staff-only ingredient catalogue, inventory category and purchasing APIs.
+// Staff-only ingredient catalogue APIs.
 app.use("/ingredients", ingredientRouter);
 app.use("/units", unitRouter);
 app.use("/ingredient-categories", categoryRouter);
 app.use("/allergens", allergenRouter);
 app.use("/inventory-categories", inventoryCategoryRouter);
 app.use("/purchases", purchaseRouter);
+app.use("/recipes", recipeRouter);
+app.use("/kot", kotRoutes);
 
 app.get("/", (_req, res) => {
   res.send("USB API Running");
