@@ -1,4 +1,4 @@
-﻿import {
+import {
   AllergenPresence,
   Prisma,
   UnitDimension,
@@ -35,6 +35,7 @@ export interface CreateIngredientInput {
   name: string;
   description?: string | null;
   categoryId?: string | null;
+  inventoryCategoryId?: string | null;
   baseUnitId: string;
   defaultPurchaseUnitId?: string | null;
   isStockTracked?: boolean;
@@ -48,6 +49,7 @@ export interface UpdateIngredientInput {
   name?: string;
   description?: string | null;
   categoryId?: string | null;
+  inventoryCategoryId?: string | null;
   baseUnitId?: string;
   defaultPurchaseUnitId?: string | null;
   isStockTracked?: boolean;
@@ -80,6 +82,7 @@ export interface AllergenUpdateInput {
 
 const ingredientInclude = {
   category: true,
+  inventoryCategory: true,
   baseUnit: true,
   defaultPurchaseUnit: true,
   unitConversions: {
@@ -201,6 +204,26 @@ async function assertActiveCategory(
 
   if (!category.isActive) {
     throw new CatalogueError("The selected ingredient category is inactive.");
+  }
+}
+
+async function assertActiveInventoryCategory(
+  tx: Prisma.TransactionClient,
+  inventoryCategoryId: string | null | undefined,
+): Promise<void> {
+  if (!inventoryCategoryId) return;
+
+  const category = await tx.inventoryCategory.findUnique({
+    where: { id: inventoryCategoryId },
+    select: { id: true, isActive: true },
+  });
+
+  if (!category) {
+    throw new CatalogueError("Inventory purchasing category not found.", 404);
+  }
+
+  if (!category.isActive) {
+    throw new CatalogueError("The selected inventory purchasing category is inactive.");
   }
 }
 
@@ -430,6 +453,7 @@ export async function createIngredient(input: CreateIngredientInput) {
 
   return prisma.$transaction(async (tx) => {
     await assertActiveCategory(tx, input.categoryId);
+    await assertActiveInventoryCategory(tx, input.inventoryCategoryId);
 
     const unitIds = [
       input.baseUnitId,
@@ -473,6 +497,9 @@ export async function createIngredient(input: CreateIngredientInput) {
         ...(input.categoryId
           ? { category: { connect: { id: input.categoryId } } }
           : {}),
+        ...(input.inventoryCategoryId
+          ? { inventoryCategory: { connect: { id: input.inventoryCategoryId } } }
+          : {}),
         ...(input.defaultPurchaseUnitId
           ? {
               defaultPurchaseUnit: {
@@ -515,6 +542,9 @@ export async function updateIngredient(
 
     if (input.categoryId !== undefined) {
       await assertActiveCategory(tx, input.categoryId);
+    }
+    if (input.inventoryCategoryId !== undefined) {
+      await assertActiveInventoryCategory(tx, input.inventoryCategoryId);
     }
 
     const nextBaseUnitId = input.baseUnitId ?? existing.baseUnitId;
@@ -595,6 +625,10 @@ export async function updateIngredient(
 
     if (input.categoryId !== undefined) {
       data.categoryId = input.categoryId;
+    }
+
+    if (input.inventoryCategoryId !== undefined) {
+      data.inventoryCategoryId = input.inventoryCategoryId;
     }
 
     if (input.baseUnitId !== undefined) {
