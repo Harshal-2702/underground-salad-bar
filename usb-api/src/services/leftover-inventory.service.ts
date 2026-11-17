@@ -3,7 +3,7 @@ import { prisma } from "../lib/prisma.js";
 import { isDateKey } from "./india-date.js";
 
 export class LeftoverInventoryError extends Error {
-  constructor(message: string, public readonly statusCode: 400 | 404 | 409 = 400) {
+  constructor(message: string, public readonly statusCode: 400 | 403 | 404 | 409 = 400) {
     super(message);
     this.name = "LeftoverInventoryError";
   }
@@ -24,7 +24,7 @@ function stocktakeDate(value: unknown): Date {
 }
 
 function nonNegativeQuantity(value: unknown): Prisma.Decimal {
-  if (typeof value !== "string" || !/^(?:0|[1-9]\\d{0,11})(?:\\.\\d{1,6})?$/.test(value.trim())) {
+  if (typeof value !== "string" || !/^(?:0|[1-9]\d{0,11})(?:\.\d{1,6})?$/.test(value.trim())) {
     throw new LeftoverInventoryError("Leftover quantity must be zero or greater, with up to 6 decimal places.");
   }
   const quantity = new Prisma.Decimal(value.trim());
