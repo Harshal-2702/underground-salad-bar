@@ -172,6 +172,7 @@ model InventoryCategory {
 
   ingredients Ingredient[]
   purchaseSheets PurchaseSheet[]
+  leftoverInventoryLines LeftoverInventoryLine[]
 
   @@index([isActive, sortOrder])
   @@index([name])
@@ -208,6 +209,7 @@ model Unit {
   ingredientsAsPurchaseUnit  Ingredient[]               @relation("IngredientDefaultPurchaseUnit")
   ingredientUnitConversions  IngredientUnitConversion[]
   purchaseLines              PurchaseLine[]
+  leftoverInventoryLines     LeftoverInventoryLine[] @relation("LeftoverInventoryBaseUnit")
   recipeVersionsAsOutputUnit RecipeVersion[]            @relation("RecipeVersionOutputUnit")
   recipeIngredientLines      RecipeIngredientLine[]
 
@@ -239,6 +241,7 @@ model Ingredient {
   unitConversions IngredientUnitConversion[]
   allergens       IngredientAllergen[]
   purchaseLines   PurchaseLine[]
+  leftoverInventoryLines LeftoverInventoryLine[]
   recipeLines     RecipeIngredientLine[]
 
   @@index([categoryId, isActive])
@@ -523,4 +526,46 @@ model PurchaseDailySequence {
   businessDate DateTime @id @db.Date
   lastSequence Int
   updatedAt    DateTime @default(now()) @updatedAt @db.Timestamp(3)
+}
+
+model LeftoverInventoryTransaction {
+  id              String   @id @default(cuid())
+  recordedByEmail String   @db.VarChar(255)
+  recordedByName  String   @db.VarChar(120)
+  stocktakeDate   DateTime @db.Date
+  createdAt       DateTime @default(now()) @db.Timestamp(3)
+
+  lines LeftoverInventoryLine[]
+
+  @@index([stocktakeDate, createdAt])
+  @@index([recordedByEmail])
+}
+
+model LeftoverInventoryLine {
+  id                            String   @id @default(cuid())
+  transactionId                 String
+  ingredientId                  String
+  inventoryCategoryId           String
+  baseUnitId                    String
+  inventoryCategoryCodeSnapshot String   @db.VarChar(40)
+  inventoryCategoryNameSnapshot String   @db.VarChar(100)
+  ingredientCodeSnapshot        String   @db.VarChar(64)
+  ingredientNameSnapshot        String   @db.VarChar(160)
+  baseUnitCodeSnapshot          String   @db.VarChar(32)
+  baseUnitNameSnapshot          String   @db.VarChar(80)
+  baseUnitSymbolSnapshot        String   @db.VarChar(16)
+  quantity                      Decimal  @db.Decimal(18, 6)
+  sortOrder                     Int      @default(0)
+  createdAt                     DateTime @default(now()) @db.Timestamp(3)
+
+  transaction       LeftoverInventoryTransaction @relation(fields: [transactionId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  ingredient        Ingredient                  @relation(fields: [ingredientId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  inventoryCategory InventoryCategory           @relation(fields: [inventoryCategoryId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  baseUnit          Unit                        @relation("LeftoverInventoryBaseUnit", fields: [baseUnitId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([transactionId, ingredientId])
+  @@index([transactionId, sortOrder])
+  @@index([inventoryCategoryId, transactionId])
+  @@index([ingredientId])
+  @@index([baseUnitId])
 }

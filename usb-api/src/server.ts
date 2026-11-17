@@ -12,6 +12,7 @@ import { recipeRouter } from "./routes/recipe.routes.js";
 import kotRoutes from "./routes/kot.routes.js";
 import { inventoryCategoryRouter } from "./routes/inventory-category.routes.js";
 import { purchaseRouter } from "./routes/purchase.routes.js";
+import { leftoverInventoryRouter } from "./routes/leftover-inventory.routes.js";
 
 const app = express();
 
@@ -91,6 +92,7 @@ app.use("/ingredient-categories", categoryRouter);
 app.use("/allergens", allergenRouter);
 app.use("/inventory-categories", inventoryCategoryRouter);
 app.use("/purchases", purchaseRouter);
+app.use("/leftover-inventory", leftoverInventoryRouter);
 app.use("/recipes", recipeRouter);
 app.use("/kot", kotRoutes);
 
