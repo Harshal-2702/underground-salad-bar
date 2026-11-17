@@ -81,6 +81,10 @@ export const getLeftoverHistory = controller(async (req) => {
   return listLeftoverInventory(filters);
 });
 
-export const getLeftoverTransaction = controller(async (req) =>
-  getLeftoverInventoryTransaction(req.params.id ?? ""),
-);
+export const getLeftoverTransaction = controller(async (req) => {
+  const id = req.params.id;
+  if (typeof id !== "string" || !id.trim()) {
+    throw new LeftoverInventoryError("Stocktake transaction ID is invalid.", 404);
+  }
+  return getLeftoverInventoryTransaction(id.trim());
+});
