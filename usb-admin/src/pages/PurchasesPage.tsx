@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { API_URL } from "../config";
+import LeftoverInventoryPanel from "./LeftoverInventoryPanel";
 import "../purchases.css";
 
 type InventoryCategory = { id: string; code: string; name: string; sortOrder: number; isActive: boolean };
@@ -287,43 +288,54 @@ function editDistance(left: string, right: string): number {
 function IngredientPicker({
   value,
   options,
+  selectedIngredientId,
   onChange,
   onSelect,
 }: {
   value: string;
   options: Ingredient[];
+  selectedIngredientId: string;
   onChange: (value: string) => void;
   onSelect: (ingredient: Ingredient) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const matches = useMemo(() => {
-    const query = value.trim().toLowerCase();
-    if (!query) return options.slice(0, 8);
-
-    const exact = options.filter((item) =>
-      item.name.toLowerCase().includes(query) ||
-      item.code.toLowerCase().includes(query) ||
-      (item.sku ?? "").toLowerCase().includes(query),
+  const [showError, setShowError] = useState(false);
+  const normalized = value.trim().toLowerCase();
+  const exactMatches = useMemo(() => {
+    if (!normalized) return [];
+    return options.filter((item) =>
+      item.name.toLowerCase() === normalized ||
+      item.code.toLowerCase() === normalized ||
+      (item.sku ?? "").toLowerCase() === normalized,
     );
-    if (exact.length || query.length < 3) return exact.slice(0, 8);
+  }, [options, normalized]);
+  const selected = options.find((item) => item.id === selectedIngredientId);
 
-    // Typo-tolerant prefix matching: e.g. "pann" still suggests "Paneer".
-    return options
-      .map((item) => {
-        const tokens = [item.name, item.code, item.sku ?? ""]
-          .flatMap((field) => field.toLowerCase().split(/[^a-z0-9]+/))
-          .filter(Boolean);
-        const distance = Math.min(...tokens.flatMap((token) =>
-          [token.slice(0, query.length), token.slice(0, query.length + 1)]
-            .map((prefix) => editDistance(query, prefix)),
-        ));
-        return { item, distance };
-      })
-      .filter((match) => match.distance <= 1)
-      .sort((left, right) => left.distance - right.distance || left.item.name.localeCompare(right.item.name))
-      .slice(0, 8)
-      .map((match) => match.item);
-  }, [options, value]);
+  const matches = useMemo(() => {
+    if (!normalized) return options.slice(0, 8);
+    return options.filter((item) =>
+      item.name.toLowerCase().includes(normalized) ||
+      item.code.toLowerCase().includes(normalized) ||
+      (item.sku ?? "").toLowerCase().includes(normalized),
+    ).slice(0, 8);
+  }, [options, normalized]);
+
+  function resolveOnBlur() {
+    if (!value.trim()) {
+      setShowError(false);
+      return;
+    }
+    if (selected && selected.name.toLowerCase() === normalized) {
+      setShowError(false);
+      return;
+    }
+    if (exactMatches.length === 1) {
+      onSelect(exactMatches[0]);
+      setShowError(false);
+      return;
+    }
+    setShowError(true);
+  }
 
   return (
     <div className="purchase-ingredient-picker">
@@ -332,14 +344,22 @@ function IngredientPicker({
         placeholder="Search ingredient or code"
         autoComplete="off"
         onFocus={() => setOpen(true)}
-        onChange={(event) => { onChange(event.target.value); setOpen(true); }}
-        onBlur={() => window.setTimeout(() => setOpen(false), 120)}
+        onChange={(event) => {
+          onChange(event.target.value);
+          setShowError(false);
+          setOpen(true);
+        }}
+        onBlur={() => window.setTimeout(() => {
+          resolveOnBlur();
+          setOpen(false);
+        }, 120)}
         onKeyDown={(event) => {
           if (event.key !== "Enter") return;
-          if (open && matches.length > 0) {
+          if (exactMatches.length === 1) {
             event.preventDefault();
             event.stopPropagation();
-            onSelect(matches[0]);
+            onSelect(exactMatches[0]);
+            setShowError(false);
             setOpen(false);
             return;
           }
@@ -352,14 +372,10 @@ function IngredientPicker({
           ) as Array<HTMLInputElement | HTMLSelectElement>;
           const currentIndex = controls.indexOf(event.currentTarget);
           const next = controls[currentIndex + 1];
-          if (next) {
-            next.focus();
-            return;
-          }
-          const nextRowControl = row.nextElementSibling?.querySelector("input, select") as HTMLInputElement | HTMLSelectElement | null;
-          if (nextRowControl) nextRowControl.focus();
+          if (next) next.focus();
         }}
         aria-label="Search ingredient catalogue"
+        aria-invalid={showError}
       />
       {open && matches.length > 0 && (
         <div className="purchase-picker-options" role="listbox">
@@ -368,15 +384,24 @@ function IngredientPicker({
               type="button"
               key={ingredient.id}
               onMouseDown={(event) => event.preventDefault()}
-              onClick={() => { onSelect(ingredient); setOpen(false); }}
+              onClick={() => {
+                onSelect(ingredient);
+                setShowError(false);
+                setOpen(false);
+              }}
               role="option"
-              aria-selected={value === ingredient.name}
+              aria-selected={selectedIngredientId === ingredient.id}
             >
               <strong>{ingredient.name}</strong>
-              <small>{ingredient.code}{ingredient.sku ? ` Â· ${ingredient.sku}` : ""}</small>
+              <small>{ingredient.code}{ingredient.sku ? ` · ${ingredient.sku}` : ""}</small>
             </button>
           ))}
         </div>
+      )}
+      {showError && (
+        <small className="purchase-inline-error" role="alert">
+          Add correct ingredient from Ingredients Catalogue.
+        </small>
       )}
     </div>
   );
@@ -412,6 +437,7 @@ export default function PurchasesPage({ accessToken, signedInEmail, onBackToOrde
   const [voiding, setVoiding] = useState(false);
   const saveQueue = useRef<Promise<void>>(Promise.resolve());
   const historyInitialLoad = useRef(false);
+  const [activePanel, setActivePanel] = useState<"purchase" | "leftover">("purchase");
 
   const activeSheet = draft.sheets.find((sheet) => sheet.inventoryCategoryId === activeCategoryId) ?? null;
   const activeCategory = categories.find((category) => category.id === activeCategoryId) ?? null;
@@ -765,6 +791,37 @@ export default function PurchasesPage({ accessToken, signedInEmail, onBackToOrde
       {error && <div className="purchase-alert purchase-alert-error" role="alert">{error}</div>}
       {notice && <div className="purchase-alert purchase-alert-success" role="status">{notice}</div>}
 
+      <div className="purchase-module-tabs" role="tablist" aria-label="Purchase management sections">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activePanel === "purchase"}
+          className={activePanel === "purchase" ? "active" : ""}
+          onClick={() => setActivePanel("purchase")}
+        >
+          Manage purchases
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activePanel === "leftover"}
+          className={activePanel === "leftover" ? "active" : ""}
+          onClick={() => setActivePanel("leftover")}
+        >
+          Leftover inventory
+        </button>
+      </div>
+
+      {activePanel === "leftover" ? (
+        <LeftoverInventoryPanel
+          accessToken={accessToken}
+          onSignOut={onSignOut}
+          categories={categories}
+          ingredients={ingredients}
+          signedInEmail={signedInEmail}
+        />
+      ) : (
+        <>
       <section className="purchase-entry-card">
         <div className="purchase-section-heading">
           <div>
@@ -850,6 +907,7 @@ export default function PurchasesPage({ accessToken, signedInEmail, onBackToOrde
                         <IngredientPicker
                           value={line.ingredientInput}
                           options={activeIngredients}
+                          selectedIngredientId={line.ingredientId}
                           onChange={(value) => updateLine(line.rowKey, { ingredientId: "", ingredientInput: value, purchaseUnitId: "" })}
                           onSelect={(ingredient) => selectIngredient(line.rowKey, ingredient)}
                         />
@@ -1055,6 +1113,8 @@ export default function PurchasesPage({ accessToken, signedInEmail, onBackToOrde
             )}
           </section>
         </div>
+      )}
+        </>
       )}
     </main>
   );
