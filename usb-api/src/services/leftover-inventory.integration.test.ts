@@ -25,6 +25,7 @@ test("leftover stocktake validates base units, saves zero, filters history and p
   const code = `IT_LEFTOVER_${suffix}`;
   let categoryId: string | undefined;
   let ingredientId: string | undefined;
+  let countIngredientId: string | undefined;
   let transactionId: string | undefined;
 
   try {
@@ -41,6 +42,15 @@ test("leftover stocktake validates base units, saves zero, filters history and p
       },
     });
     ingredientId = ingredient.id;
+    const countIngredient = await prisma.ingredient.create({
+      data: {
+        code: `IT_LEFTOVER_EACH_${suffix}`,
+        name: "Leftover test count ingredient",
+        inventoryCategoryId: category.id,
+        baseUnitId: "unit_each",
+      },
+    });
+    countIngredientId = countIngredient.id;
 
     await assert.rejects(
       submitLeftoverInventory("test@example.invalid", {
@@ -54,13 +64,22 @@ test("leftover stocktake validates base units, saves zero, filters history and p
     const transaction = await submitLeftoverInventory("test@example.invalid", {
       recordedByName: "Test Staff",
       stocktakeDate: "2026-11-17",
-      lines: [{ ingredientId: ingredient.id, quantity: "0" }],
+      lines: [
+        { ingredientId: ingredient.id, quantity: "0" },
+        { ingredientId: countIngredient.id, quantity: "1.5" },
+      ],
     });
     transactionId = transaction.id;
 
-    assert.equal(transaction.lines.length, 1);
-    assert.equal(transaction.lines[0]?.quantity.toString(), "0");
-    assert.equal(transaction.lines[0]?.baseUnitSymbolSnapshot, "g");
+    assert.equal(transaction.lines.length, 2);
+    const gramLine = transaction.lines.find((line) => line.ingredientId === ingredient.id);
+    const eachLine = transaction.lines.find((line) => line.ingredientId === countIngredient.id);
+    assert.equal(gramLine?.quantity.toString(), "0");
+    assert.equal(gramLine?.baseUnitCodeSnapshot, "G");
+    assert.equal(gramLine?.baseUnitSymbolSnapshot, "g");
+    assert.equal(eachLine?.quantity.toString(), "1.5");
+    assert.equal(eachLine?.baseUnitCodeSnapshot, "EACH");
+    assert.equal(eachLine?.baseUnitSymbolSnapshot, "each");
 
     const history = await listLeftoverInventory({
       from: "2026-11-17",
@@ -71,11 +90,11 @@ test("leftover stocktake validates base units, saves zero, filters history and p
     assert.ok(history.items.some((item) => item.id === transaction.id));
 
     const detail = await getLeftoverInventoryTransaction(transaction.id);
-    assert.equal(detail.lines[0]?.ingredientNameSnapshot, "Leftover test ingredient");
+    assert.equal(detail.lines.find((line) => line.ingredientId === ingredient.id)?.ingredientNameSnapshot, "Leftover test ingredient");
 
     await prisma.ingredient.update({ where: { id: ingredient.id }, data: { name: "Renamed after stocktake" } });
     const preserved = await getLeftoverInventoryTransaction(transaction.id);
-    assert.equal(preserved.lines[0]?.ingredientNameSnapshot, "Leftover test ingredient");
+    assert.equal(preserved.lines.find((line) => line.ingredientId === ingredient.id)?.ingredientNameSnapshot, "Leftover test ingredient");
   } finally {
     await prisma.$transaction(async (tx) => {
       if (transactionId) {
@@ -83,6 +102,7 @@ test("leftover stocktake validates base units, saves zero, filters history and p
         await tx.leftoverInventoryTransaction.deleteMany({ where: { id: transactionId } });
       }
       if (ingredientId) await tx.ingredient.deleteMany({ where: { id: ingredientId } });
+      if (countIngredientId) await tx.ingredient.deleteMany({ where: { id: countIngredientId } });
       if (categoryId) await tx.inventoryCategory.deleteMany({ where: { id: categoryId } });
     });
     await prisma.$disconnect();
