@@ -4,9 +4,11 @@ on:
   push:
     branches:
       - release/production-purchase-register
+      - feature/purchase-leftover-inventory-ui
   pull_request:
     branches:
       - feature/phase-1-security
+      - release/production-purchase-register
 
 jobs:
   api:
