@@ -269,22 +269,6 @@ function validAmount(value: string): boolean {
   return /^(?:0|[1-9]\d{0,15})(?:\.\d{1,2})?$/.test(value.trim()) && Number(value) > 0;
 }
 
-function editDistance(left: string, right: string): number {
-  const previous = Array.from({ length: right.length + 1 }, (_, index) => index);
-  for (let row = 1; row <= left.length; row += 1) {
-    const current = [row];
-    for (let column = 1; column <= right.length; column += 1) {
-      current[column] = Math.min(
-        current[column - 1] + 1,
-        previous[column] + 1,
-        previous[column - 1] + (left[row - 1] === right[column - 1] ? 0 : 1),
-      );
-    }
-    for (let column = 0; column <= right.length; column += 1) previous[column] = current[column];
-  }
-  return previous[right.length];
-}
-
 function IngredientPicker({
   value,
   options,
