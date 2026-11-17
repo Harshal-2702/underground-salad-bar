@@ -45,7 +45,7 @@ function isTrustedAdminPreviewOrigin(origin: string): boolean {
   return (
     parsedOrigin.protocol === "https:" &&
     parsedOrigin.origin === origin &&
-    /^underground-salad-bar-5213-[a-z0-9-]+-harshals-projects-d6c7ef90\.vercel\.app$/i.test(
+    /^(?:underground-salad-bar-5213-[a-z0-9-]+|underground-salad-bar-521-git-[a-z0-9-]+)-harshals-projects-d6c7ef90\\.vercel\\.app$/i.test(
       parsedOrigin.hostname
     )
   );
