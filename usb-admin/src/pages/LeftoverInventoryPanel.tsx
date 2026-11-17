@@ -167,7 +167,10 @@ export default function LeftoverInventoryPanel({
       setError("Enter the name of the person recording this stocktake.");
       return;
     }
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(stocktakeDate)) {
+    const parsedDate = new Date(stocktakeDate + "T00:00:00.000Z");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(stocktakeDate) ||
+        Number.isNaN(parsedDate.getTime()) ||
+        parsedDate.toISOString().slice(0, 10) !== stocktakeDate) {
       setError("Choose a valid stocktake date.");
       return;
     }
@@ -254,15 +257,19 @@ export default function LeftoverInventoryPanel({
     }
   }
 
-  const detailGroups = detail
-    ? [...new Map(detail.lines.map((line) => [
-        line.inventoryCategoryId,
-        {
-          name: line.inventoryCategoryNameSnapshot,
-          lines: detail.lines.filter((item) => item.inventoryCategoryId === line.inventoryCategoryId),
-        },
-      ])).values()]
-    : [];
+  const detailGroupMap = new Map<string, { name: string; lines: LeftoverLine[] }>();
+  for (const line of detail?.lines ?? []) {
+    const group = detailGroupMap.get(line.inventoryCategoryId);
+    if (group) {
+      group.lines.push(line);
+    } else {
+      detailGroupMap.set(line.inventoryCategoryId, {
+        name: line.inventoryCategoryNameSnapshot,
+        lines: [line],
+      });
+    }
+  }
+  const detailGroups = [...detailGroupMap.values()];
 
   return (
     <div className="leftover-inventory-panel">
