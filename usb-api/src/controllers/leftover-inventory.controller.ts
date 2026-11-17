@@ -11,7 +11,7 @@ import {
 function adminEmail(res: Response): string {
   const email = res.locals.adminEmail;
   if (typeof email !== "string" || !email.trim()) {
-    throw new LeftoverInventoryError("Verified staff identity is missing.", 409);
+    throw new LeftoverInventoryError("Verified staff identity is missing.", 403);
   }
   return email.trim().toLowerCase();
 }
@@ -28,7 +28,7 @@ function queryString(req: Request, field: string, maxLength = 200): string | und
 function queryInteger(req: Request, field: string, fallback: number, max: number): number {
   const value = queryString(req, field, 12);
   if (value === undefined) return fallback;
-  if (!/^\\d+$/.test(value)) throw new LeftoverInventoryError(`${field} must be a whole number.`);
+  if (!/^\d+$/.test(value)) throw new LeftoverInventoryError(`${field} must be a whole number.`);
   const parsed = Number(value);
   if (!Number.isSafeInteger(parsed) || parsed < 1 || parsed > max) {
     throw new LeftoverInventoryError(`${field} is outside the supported range.`);
