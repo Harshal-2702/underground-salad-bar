@@ -26,6 +26,14 @@ type Category = {
   isActive: boolean;
 };
 
+type InventoryCategory = {
+  id: string;
+  code: string;
+  name: string;
+  sortOrder: number;
+  isActive: boolean;
+};
+
 type Allergen = {
   id: string;
   code: string;
@@ -40,12 +48,14 @@ type Ingredient = {
   name: string;
   description: string | null;
   categoryId: string | null;
+  inventoryCategoryId: string | null;
   baseUnitId: string;
   defaultPurchaseUnitId: string | null;
   isStockTracked: boolean;
   isActive: boolean;
   sortOrder: number;
   category: Category | null;
+  inventoryCategory: InventoryCategory | null;
   baseUnit: Unit;
   defaultPurchaseUnit: Unit | null;
   unitConversions: Array<{
@@ -70,6 +80,7 @@ type IngredientForm = {
   name: string;
   description: string;
   categoryId: string;
+  inventoryCategoryId: string;
   baseUnitId: string;
   defaultPurchaseUnitId: string;
   conversionQuantity: string;
@@ -89,6 +100,7 @@ const blankForm: IngredientForm = {
   name: "",
   description: "",
   categoryId: "",
+  inventoryCategoryId: "",
   baseUnitId: "",
   defaultPurchaseUnitId: "",
   conversionQuantity: "",
@@ -180,6 +192,7 @@ export default function IngredientsPage({
 }: Props) {
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [inventoryCategories, setInventoryCategories] = useState<InventoryCategory[]>([]);
   const [units, setUnits] = useState<Unit[]>([]);
   const [allergens, setAllergens] = useState<Allergen[]>([]);
 
@@ -187,6 +200,14 @@ export default function IngredientsPage({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [inventoryCategoryManagerOpen, setInventoryCategoryManagerOpen] = useState(false);
+  const [inventoryCategorySaving, setInventoryCategorySaving] = useState(false);
+  const [editingInventoryCategoryId, setEditingInventoryCategoryId] = useState<string | null>(null);
+  const [inventoryCategoryForm, setInventoryCategoryForm] = useState({
+    code: "",
+    name: "",
+    sortOrder: "0",
+  });
 
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState("ALL");
@@ -215,7 +236,7 @@ export default function IngredientsPage({
     setError("");
 
     try {
-      const [ingredientRows, categoryRows, unitRows, allergenRows] =
+      const [ingredientRows, categoryRows, inventoryCategoryRows, unitRows, allergenRows] =
         await Promise.all([
           apiRequest<Ingredient[]>(
             "/ingredients?includeInactive=true",
@@ -223,12 +244,14 @@ export default function IngredientsPage({
             onSignOut,
           ),
           apiRequest<Category[]>("/ingredient-categories", accessToken, onSignOut),
+          apiRequest<InventoryCategory[]>("/inventory-categories", accessToken, onSignOut),
           apiRequest<Unit[]>("/units", accessToken, onSignOut),
           apiRequest<Allergen[]>("/allergens", accessToken, onSignOut),
         ]);
 
       setIngredients(ingredientRows);
       setCategories(categoryRows);
+      setInventoryCategories(inventoryCategoryRows);
       setUnits(unitRows);
       setAllergens(allergenRows);
 
@@ -315,6 +338,7 @@ export default function IngredientsPage({
       name: item.name,
       description: item.description ?? "",
       categoryId: item.categoryId ?? "",
+      inventoryCategoryId: item.inventoryCategoryId ?? "",
       baseUnitId: item.baseUnitId,
       defaultPurchaseUnitId: item.defaultPurchaseUnitId ?? "",
       conversionQuantity: "",
@@ -337,6 +361,7 @@ export default function IngredientsPage({
         name: form.name.trim(),
         description: form.description.trim() || null,
         categoryId: form.categoryId || null,
+        inventoryCategoryId: form.inventoryCategoryId || null,
         isStockTracked: form.isStockTracked,
         sortOrder: Number(form.sortOrder || 0),
       };
@@ -620,6 +645,65 @@ export default function IngredientsPage({
     }
   }
 
+  function startNewInventoryCategory() {
+    setEditingInventoryCategoryId(null);
+    setInventoryCategoryForm({ code: "", name: "", sortOrder: "0" });
+    setError("");
+  }
+
+  function startEditInventoryCategory(category: InventoryCategory) {
+    setEditingInventoryCategoryId(category.id);
+    setInventoryCategoryForm({
+      code: category.code,
+      name: category.name,
+      sortOrder: String(category.sortOrder),
+    });
+    setError("");
+  }
+
+  async function saveInventoryCategory(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setInventoryCategorySaving(true);
+    setError("");
+    setNotice("");
+
+    try {
+      const payload = {
+        code: inventoryCategoryForm.code.trim(),
+        name: inventoryCategoryForm.name.trim(),
+        sortOrder: Number(inventoryCategoryForm.sortOrder || 0),
+      };
+      const saved = await apiRequest<InventoryCategory>(
+        editingInventoryCategoryId
+          ? `/inventory-categories/${editingInventoryCategoryId}`
+          : "/inventory-categories",
+        accessToken,
+        onSignOut,
+        {
+          method: editingInventoryCategoryId ? "PATCH" : "POST",
+          body: JSON.stringify(payload),
+        },
+      );
+
+      setInventoryCategories((current) => {
+        const next = editingInventoryCategoryId
+          ? current.map((category) => category.id === saved.id ? saved : category)
+          : [...current, saved];
+        return next.sort((left, right) =>
+          left.sortOrder - right.sortOrder || left.name.localeCompare(right.name),
+        );
+      });
+      setInventoryCategoryForm({ code: "", name: "", sortOrder: "0" });
+      setEditingInventoryCategoryId(null);
+      setNotice(editingInventoryCategoryId ? "Purchasing category updated." : "Purchasing category created.");
+      await loadCatalogue();
+    } catch (categoryError) {
+      setError(errorMessage(categoryError));
+    } finally {
+      setInventoryCategorySaving(false);
+    }
+  }
+
   return (
     <main className="catalogue-shell">
       <header className="catalogue-header">
@@ -652,9 +736,20 @@ export default function IngredientsPage({
           <p>Manage your kitchen ingredients, measurement units and allergen information.</p>
         </div>
 
-        <button className="catalogue-button catalogue-button-primary" onClick={openCreate}>
-          + Add ingredient
-        </button>
+        <div className="catalogue-intro-actions">
+          <button
+            className="catalogue-button catalogue-button-secondary"
+            onClick={() => {
+              setError("");
+              setInventoryCategoryManagerOpen(true);
+            }}
+          >
+            Manage purchasing categories
+          </button>
+          <button className="catalogue-button catalogue-button-primary" onClick={openCreate}>
+            + Add ingredient
+          </button>
+        </div>
       </section>
 
       <section className="catalogue-stats">
@@ -723,7 +818,7 @@ export default function IngredientsPage({
           <div className="catalogue-list-heading">
             <span>{visibleIngredients.length} ingredients</span>
             <span>Name / code</span>
-            <span>Category</span>
+            <span>Ingredient group / purchase category</span>
             <span>Base unit</span>
             <span>Status</span>
             <span>Actions</span>
@@ -752,8 +847,9 @@ export default function IngredientsPage({
                   </button>
 
                   <div className="catalogue-row-category">
-                    <span className="catalogue-mobile-label">Category</span>
-                    {item.category?.name ?? "Uncategorised"}
+                    <span className="catalogue-mobile-label">Ingredient group</span>
+                    <strong>{item.category?.name ?? "Uncategorised"}</strong>
+                    <small>Purchases: {item.inventoryCategory?.name ?? "Not assigned"}</small>
                   </div>
 
                   <div className="catalogue-row-unit">
@@ -814,8 +910,12 @@ export default function IngredientsPage({
 
               <div className="catalogue-detail-facts">
                 <div>
-                  <span>Category</span>
+                  <span>Ingredient group</span>
                   <strong>{selected.category?.name ?? "Uncategorised"}</strong>
+                </div>
+                <div>
+                  <span>Purchasing category</span>
+                  <strong>{selected.inventoryCategory?.name ?? "Not assigned"}</strong>
                 </div>
                 <div>
                   <span>Base unit</span>
@@ -1094,7 +1194,7 @@ export default function IngredientsPage({
                   />
                 </label>
                 <label>
-                  Category
+                  Ingredient group
                   <select
                     value={form.categoryId}
                     onChange={(event) => setForm({ ...form, categoryId: event.target.value })}
@@ -1104,6 +1204,21 @@ export default function IngredientsPage({
                       <option key={category.id} value={category.id}>{category.name}</option>
                     ))}
                   </select>
+                  <small className="catalogue-field-help">Used to organise the ingredient catalogue.</small>
+                </label>
+                <label>
+                  Purchasing category
+                  <select
+                    required={form.isStockTracked}
+                    value={form.inventoryCategoryId}
+                    onChange={(event) => setForm({ ...form, inventoryCategoryId: event.target.value })}
+                  >
+                    <option value="">Select purchasing category</option>
+                    {inventoryCategories.filter((category) => category.isActive).map((category) => (
+                      <option key={category.id} value={category.id}>{category.name}</option>
+                    ))}
+                  </select>
+                  <small className="catalogue-field-help">This is the shared category used to group the ingredient in Purchases.</small>
                 </label>
                 <label>
                   Display order
@@ -1215,6 +1330,116 @@ export default function IngredientsPage({
                 </button>
               </div>
             </form>
+          </section>
+        </div>
+      )}
+
+      {inventoryCategoryManagerOpen && (
+        <div className="catalogue-modal-backdrop" role="presentation" onMouseDown={(event) => {
+          if (event.target === event.currentTarget && !inventoryCategorySaving) setInventoryCategoryManagerOpen(false);
+        }}>
+          <section
+            className="catalogue-modal catalogue-category-manager-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="inventory-category-manager-title"
+          >
+            <div className="catalogue-modal-heading">
+              <div>
+                <div className="catalogue-eyebrow">SHARED MASTER DATA</div>
+                <h2 id="inventory-category-manager-title">Purchasing categories</h2>
+                <p className="catalogue-modal-description">
+                  These categories are shared by Ingredients and Purchases. Assign one to each stock-tracked ingredient.
+                </p>
+              </div>
+              <button
+                className="catalogue-modal-close"
+                onClick={() => setInventoryCategoryManagerOpen(false)}
+                disabled={inventoryCategorySaving}
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+
+            <form className="catalogue-form" onSubmit={(event) => void saveInventoryCategory(event)}>
+              <div className="catalogue-form-grid">
+                <label>
+                  Category code
+                  <input
+                    required
+                    maxLength={40}
+                    value={inventoryCategoryForm.code}
+                    onChange={(event) => setInventoryCategoryForm({ ...inventoryCategoryForm, code: event.target.value })}
+                    placeholder="e.g. VEGETABLES"
+                  />
+                </label>
+                <label>
+                  Category name
+                  <input
+                    required
+                    maxLength={100}
+                    value={inventoryCategoryForm.name}
+                    onChange={(event) => setInventoryCategoryForm({ ...inventoryCategoryForm, name: event.target.value })}
+                    placeholder="e.g. Vegetables"
+                  />
+                </label>
+                <label>
+                  Display order
+                  <input
+                    type="number"
+                    min="0"
+                    max="1000000"
+                    step="1"
+                    value={inventoryCategoryForm.sortOrder}
+                    onChange={(event) => setInventoryCategoryForm({ ...inventoryCategoryForm, sortOrder: event.target.value })}
+                  />
+                </label>
+              </div>
+              <div className="catalogue-form-actions">
+                <button className="catalogue-button catalogue-button-primary" disabled={inventoryCategorySaving}>
+                  {inventoryCategorySaving ? "Saving…" : editingInventoryCategoryId ? "Save category" : "Create category"}
+                </button>
+                {editingInventoryCategoryId && (
+                  <button
+                    type="button"
+                    className="catalogue-button catalogue-button-quiet"
+                    onClick={startNewInventoryCategory}
+                    disabled={inventoryCategorySaving}
+                  >
+                    Cancel edit
+                  </button>
+                )}
+              </div>
+            </form>
+
+            <div className="catalogue-category-manager-list">
+              <div className="catalogue-category-manager-heading">
+                <strong>Existing purchasing categories</strong>
+                <span>{inventoryCategories.filter((category) => category.isActive).length} active</span>
+              </div>
+              {inventoryCategories.filter((category) => category.isActive).length === 0 ? (
+                <p className="catalogue-muted">No purchasing categories have been created yet.</p>
+              ) : (
+                inventoryCategories
+                  .filter((category) => category.isActive)
+                  .map((category) => (
+                    <div className="catalogue-category-manager-row" key={category.id}>
+                      <div>
+                        <strong>{category.name}</strong>
+                        <small>{category.code} · Order {category.sortOrder}</small>
+                      </div>
+                      <button
+                        className="catalogue-text-button"
+                        onClick={() => startEditInventoryCategory(category)}
+                        disabled={inventoryCategorySaving}
+                      >
+                        Edit
+                      </button>
+                    </div>
+                  ))
+              )}
+            </div>
           </section>
         </div>
       )}
