@@ -349,7 +349,6 @@ function buildKotPrintHtml(order: OrderRecord, config: KotTemplateConfig): strin
   ${rows || "<div>No items</div>"}
   ${instructions}
   ${footer}
-  <script>window.addEventListener("load", () => { window.focus(); setTimeout(() => window.print(), 350); });</script>
 </body></html>`;
 }
 
@@ -382,7 +381,7 @@ function sampleKotOrder(): OrderRecord {
       bowlName: "Continental Bowl",
       quantity: 1,
       price: 0,
-      details: "Rice\\nGrilled chicken\\nRoasted vegetables\\nPesto dressing",
+      details: ["Rice", "Grilled chicken", "Roasted vegetables", "Pesto dressing"].join("\n"),
     }],
     statusEvents: [],
   };
@@ -740,7 +739,7 @@ export default function OrdersPage({
           printWindow.focus();
           printWindow.print();
           setPrintNotice(`Print dialog opened for ${order.kotNumber}. Choose DCode DCRP30 and confirm the paper output.`);
-          window.setTimeout(() => setPrintingOrderId((current) => current === order.id ? null : current), 1500);
+          window.setTimeout(() => setPrintingOrderId((current) => current === order.id ? null : current), 60000);
         }
       }, 600);
     } catch (error) {
@@ -960,7 +959,7 @@ export default function OrdersPage({
               <div className="kot-note-card">
                 <strong>Manual printing test</strong>
                 <p>Print a sample ticket through the Windows printer driver. This opens the browser print dialog; automatic silent printing remains disabled until the local print bridge is installed and tested.</p>
-                <button type="button" className="kot-button kot-button-primary kot-print-sample" onClick={() => printKot(sampleKotOrder())} disabled={printingOrderId !== null}>
+                <button type="button" className="kot-button kot-button-primary kot-print-sample" onClick={() => printKot(sampleKotOrder())} disabled={printingOrderId !== null || templateLoading}>
                   {printingOrderId === "sample-kot" ? "Opening print dialog…" : "Print sample KOT"}
                 </button>
               </div>
@@ -1163,7 +1162,7 @@ export default function OrdersPage({
                       {order.status === "PENDING" && <button className="kot-button kot-button-primary kot-card-action" disabled={busyOrder} onClick={() => void updateStatus(order, "CONFIRMED")}>Accept</button>}
                       {(order.status === "CONFIRMED" || order.status === "PREPARING") && <button className="kot-button kot-button-primary kot-card-action" disabled={busyOrder} onClick={() => void updateStatus(order, "READY")}>Mark ready</button>}
                       {order.status === "READY" && <button className="kot-button kot-button-secondary kot-card-action" disabled={busyOrder} onClick={() => void updateStatus(order, "OUT_FOR_DELIVERY")}>Handed over</button>}
-                      <button type="button" className="kot-button kot-button-secondary kot-card-action kot-print-action" disabled={printingOrderId !== null} onClick={() => printKot(order)}>{printingOrderId === order.id ? "Printing…" : "Print KOT"}</button>
+                      <button type="button" className="kot-button kot-button-secondary kot-card-action kot-print-action" disabled={printingOrderId !== null || templateLoading} onClick={() => printKot(order)}>{printingOrderId === order.id ? "Printing…" : "Print KOT"}</button>
                       {order.status === "CANCELLED" && <span className="kot-card-terminal">Cancelled</span>}
                       {(order.status === "OUT_FOR_DELIVERY" || order.status === "DELIVERED") && <span className="kot-card-terminal">Handed over</span>}
                     </div>
@@ -1235,7 +1234,7 @@ export default function OrdersPage({
                 )}
               </div>
               <div className="kot-order-actions">
-                <button className="kot-button kot-button-secondary" disabled={printingOrderId !== null} onClick={() => printKot(selectedOrder)}>{printingOrderId === selectedOrder.id ? "Printing…" : "Print KOT"}</button>
+                <button type="button" className="kot-button kot-button-secondary" disabled={printingOrderId !== null || templateLoading} onClick={() => printKot(selectedOrder)}>{printingOrderId === selectedOrder.id ? "Printing…" : "Print KOT"}</button>
                 {selectedOrder.status === "PENDING" && <button className="kot-button kot-button-primary" disabled={busyOrder} onClick={() => void updateStatus(selectedOrder, "CONFIRMED")}>Accept order</button>}
                 {(selectedOrder.status === "CONFIRMED" || selectedOrder.status === "PREPARING") && <button className="kot-button kot-button-primary" disabled={busyOrder} onClick={() => void updateStatus(selectedOrder, "READY")}>Mark ready</button>}
                 {selectedOrder.status === "READY" && <button className="kot-button kot-button-primary" disabled={busyOrder} onClick={() => void updateStatus(selectedOrder, "OUT_FOR_DELIVERY")}>Handed over</button>}
