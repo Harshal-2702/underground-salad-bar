@@ -295,6 +295,7 @@ type OrdersPageProps = {
   onSignOut: () => Promise<void>;
   onOpenIngredients: () => void;
   onOpenRecipes: () => void;
+  onOpenPurchases: () => void;
 };
 
 export default function OrdersPage({
@@ -303,6 +304,7 @@ export default function OrdersPage({
   onSignOut,
   onOpenIngredients,
   onOpenRecipes,
+  onOpenPurchases,
 }: OrdersPageProps) {
   const [view, setView] = useState<View>("orders");
   const [ordersData, setOrdersData] = useState<OrdersResponse | null>(null);
@@ -834,6 +836,7 @@ export default function OrdersPage({
         <div className="kot-header-actions">
           <button className="kot-button kot-button-secondary" onClick={onOpenIngredients}>Ingredients</button>
           <button className="kot-button kot-button-secondary" onClick={onOpenRecipes}>Recipes</button>
+          <button className="kot-button kot-button-secondary" onClick={onOpenPurchases}>Purchases</button>
           <button className="kot-button kot-button-primary" onClick={() => { setTimingSettingsOpen(false); setView("designer"); setTemplateNotice(""); }}>Design KOT</button>
           <button className="kot-button kot-button-quiet" onClick={() => void onSignOut()}>Sign out</button>
         </div>

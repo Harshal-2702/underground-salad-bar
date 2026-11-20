@@ -484,3 +484,83 @@
   .catalogue-signed-in { max-width: 150px; overflow-wrap: anywhere; }
   .catalogue-header-actions { flex-direction: column; align-items: stretch; }
 }
+
+/* Shared inventory purchasing category manager */
+.catalogue-intro-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+.catalogue-modal-description {
+  max-width: 540px;
+  margin: 7px 0 0;
+  color: #737b72;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.catalogue-category-manager-list {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid #efeee9;
+}
+.catalogue-category-manager-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+  color: #3f493f;
+  font-size: 12px;
+}
+.catalogue-category-manager-heading span {
+  color: #828a80;
+  font-size: 11px;
+}
+.catalogue-category-manager-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 2px;
+  border-top: 1px solid #f0f0eb;
+}
+.catalogue-category-manager-row > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.catalogue-category-manager-row strong {
+  color: #263d2d;
+  font-size: 13px;
+}
+.catalogue-category-manager-row small {
+  color: #858c83;
+  font-size: 10px;
+}
+.catalogue-category-manager-modal {
+  max-height: min(88vh, 760px);
+  overflow-y: auto;
+}
+.catalogue-row-category strong {
+  display: block;
+  color: #39483c;
+  font-size: 12px;
+  font-weight: 600;
+}
+.catalogue-row-category small {
+  display: block;
+  margin-top: 4px;
+  color: #8a9087;
+  font-size: 10px;
+}
+
+@media (max-width: 760px) {
+  .catalogue-intro-actions {
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .catalogue-intro-actions .catalogue-button { width: 100%; }
+}
