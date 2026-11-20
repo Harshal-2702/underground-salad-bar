@@ -292,11 +292,11 @@ function buildKotPrintHtml(order: OrderRecord, config: KotTemplateConfig): strin
   const contentWidth = width === "80mm" ? "72mm" : "48mm";
   const margin = config.margin === "narrow" ? "1mm" : config.margin === "wide" ? "4mm" : "2mm";
   const lineHeight = config.lineSpacing === "compact" ? 1.15 : config.lineSpacing === "relaxed" ? 1.65 : 1.35;
-  const customerName = customerDetails(order).name.trim().split(/\\s+/)[0] || "Guest";
+  const customerName = customerDetails(order).name.trim().split(/\s+/)[0] || "Guest";
   const receivedAt = dateTimeLabel(order.createdAt);
   const rows = order.bowls.map((bowl) => {
     const details = config.showIngredients && bowl.details
-      ? `<div class="details">${escapePrintText(bowl.details).replace(/\\r?\\n/g, "<br>")}</div>`
+      ? `<div class="details">${escapePrintText(bowl.details).replace(/\r?\n/g, "<br>")}</div>`
       : "";
     return `<section class="item">
       <div class="item-heading"><strong>${escapePrintText(String(bowl.quantity))} × ${escapePrintText(bowl.bowlName)}</strong></div>
@@ -313,7 +313,7 @@ function buildKotPrintHtml(order: OrderRecord, config: KotTemplateConfig): strin
     ? `<div class="meta">Customer: ${escapePrintText(customerName)}</div>`
     : "";
   const instructions = order.specialInstructions?.trim()
-    ? `<section class="special"><strong>Special instructions</strong><div>${escapePrintText(order.specialInstructions).replace(/\\r?\\n/g, "<br>")}</div></section>`
+    ? `<section class="special"><strong>Special instructions</strong><div>${escapePrintText(order.specialInstructions).replace(/\r?\n/g, "<br>")}</div></section>`
     : "";
   const footer = config.footerText.trim()
     ? `<div class="footer">${escapePrintText(config.footerText.trim())}</div>`
@@ -830,7 +830,7 @@ export default function OrdersPage({
           <div>
             <p className="kot-eyebrow">UNDERGROUND KITCHEN OS</p>
             <h1>KOT Designer</h1>
-            <p className="kot-muted">Configure the kitchen ticket layout. Physical printing will be enabled in a later milestone.</p>
+            <p className="kot-muted">Design and print KOTs using the Windows driver. Silent automatic printing remains disabled.</p>
           </div>
           <div className="kot-header-actions">
             <button className="kot-button kot-button-secondary" onClick={() => setView("orders")}>Back to orders</button>
@@ -947,9 +947,9 @@ export default function OrdersPage({
               </div>
 
               <div className="kot-panel kot-readiness-panel">
-                <div className="kot-panel-heading"><div><h2>Kitchen print settings</h2><p>Prepared now; physical printing is a later milestone.</p></div></div>
+                <div className="kot-panel-heading"><div><h2>Kitchen print settings</h2><p>Manual printing uses the Windows driver; silent printing remains disabled.</p></div></div>
                 <div className="kot-readiness-row"><span>Automatic printing</span><label className="kot-disabled-switch"><input type="checkbox" disabled/><strong>OFF · KOT-03</strong></label></div>
-                <div className="kot-readiness-row"><span>Print trigger</span><strong>After staff acceptance</strong></div>
+                <div className="kot-readiness-row"><span>Planned auto-print trigger</span><strong>After staff acceptance</strong></div>
                 <div className="kot-readiness-row"><span>Printer</span><strong>DCode DCRP30 · Windows driver</strong></div>
                 <div className="kot-readiness-row"><span>Default paper preview</span><strong>{templateConfig.paperWidth}</strong></div>
                 <div className="kot-readiness-row"><span>Website channel</span><strong className="kot-ready-text">Existing order flow</strong></div>
@@ -1015,7 +1015,7 @@ export default function OrdersPage({
             <label className="kot-sound-toggle"><input type="checkbox" checked={soundEnabled} onChange={(event) => handleSoundToggle(event.target.checked)}/> Sound alerts</label>
             <label className="kot-auto-print-toggle" title="Automatic printing becomes available after printer setup in KOT-02 and print-service activation in KOT-03.">
               <input type="checkbox" checked={false} disabled aria-label="Automatic printing unavailable until printer setup"/>
-              <span>Auto-print</span><small>OFF · printer setup pending</small>
+              <span>Auto-print</span><small>OFF · manual only</small>
             </label>
             <div className="kot-timing-utility" ref={timingPopoverRef}>
               <button
