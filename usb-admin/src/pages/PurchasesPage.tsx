@@ -811,7 +811,7 @@ export default function PurchasesPage({ accessToken, signedInEmail, onBackToOrde
           <div>
             <p className="purchase-eyebrow">NEW PURCHASE</p>
             <h2>Category sheets</h2>
-            <p className="purchase-muted">Each category keeps its own date, supplier and optional invoice number. Empty sheets are not submitted.</p>
+            <p className="purchase-muted">You can purchase from just one category. Only sheets with entered ingredient rows are included; untouched categories are ignored. Each included category keeps its own date, supplier and optional invoice number.</p>
           </div>
           <button type="button" className="purchase-button purchase-button-primary" onClick={() => void openReview()} disabled={savingDraft || submitting}>
             Review &amp; Submit
@@ -915,7 +915,7 @@ export default function PurchasesPage({ accessToken, signedInEmail, onBackToOrde
                         <input className="purchase-number-input" inputMode="decimal" value={line.itemAmount} placeholder="0.00" onChange={(event) => updateLine(line.rowKey, { itemAmount: event.target.value })} onKeyDown={handleRowEnter} aria-label={`Total item amount row ${index + 1}`} />
                       </td>
                       <td className="purchase-row-action">
-                        <button type="button" className="purchase-remove-button" onClick={() => removeLine(line.rowKey)} aria-label={`Remove row ${index + 1}`} disabled={activeSheet.lines.length === 1}>Remove</button>
+                        <button type="button" className="purchase-remove-button" onClick={() => removeLine(line.rowKey)} aria-label={`Remove row ${index + 1}`}>Remove</button>
                       </td>
                     </tr>
                   ))}
