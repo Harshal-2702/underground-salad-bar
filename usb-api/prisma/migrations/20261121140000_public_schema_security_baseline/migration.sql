@@ -4,27 +4,60 @@
 
 BEGIN;
 
--- Remove access from the browser-facing Supabase roles from current objects.
-REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM anon, authenticated;
-REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM anon, authenticated;
-REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA public FROM anon, authenticated;
-
--- Keep future Prisma-created objects private by default.
-ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
-  REVOKE ALL ON TABLES FROM anon, authenticated;
-ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
-  REVOKE ALL ON SEQUENCES FROM anon, authenticated;
-ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
-  REVOKE EXECUTE ON FUNCTIONS FROM anon, authenticated;
-
--- Some Supabase-managed installations have objects created as supabase_admin.
--- CI uses plain PostgreSQL where that role may not exist, so apply conditionally.
+-- Supabase creates anon/authenticated roles; plain PostgreSQL CI does not.
+-- Build a safely quoted role list so the same migration works in both environments.
 DO $security$
+DECLARE
+  v_browser_roles text;
 BEGIN
-  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'supabase_admin') THEN
-    EXECUTE 'ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public REVOKE ALL ON TABLES FROM anon, authenticated';
-    EXECUTE 'ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public REVOKE ALL ON SEQUENCES FROM anon, authenticated';
-    EXECUTE 'ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public REVOKE EXECUTE ON FUNCTIONS FROM anon, authenticated';
+  SELECT string_agg(quote_ident(rolname), ', ')
+    INTO v_browser_roles
+  FROM pg_roles
+  WHERE rolname IN ('anon', 'authenticated');
+
+  IF v_browser_roles IS NOT NULL THEN
+    EXECUTE format(
+      'REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM %s',
+      v_browser_roles
+    );
+    EXECUTE format(
+      'REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM %s',
+      v_browser_roles
+    );
+    EXECUTE format(
+      'REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA public FROM %s',
+      v_browser_roles
+    );
+
+    -- Keep future Prisma-created objects private by default.
+    EXECUTE format(
+      'ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE ALL ON TABLES FROM %s',
+      v_browser_roles
+    );
+    EXECUTE format(
+      'ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE ALL ON SEQUENCES FROM %s',
+      v_browser_roles
+    );
+    EXECUTE format(
+      'ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE EXECUTE ON FUNCTIONS FROM %s',
+      v_browser_roles
+    );
+
+    -- Supabase-managed objects created as supabase_admin follow the same policy.
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'supabase_admin') THEN
+      EXECUTE format(
+        'ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public REVOKE ALL ON TABLES FROM %s',
+        v_browser_roles
+      );
+      EXECUTE format(
+        'ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public REVOKE ALL ON SEQUENCES FROM %s',
+        v_browser_roles
+      );
+      EXECUTE format(
+        'ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public REVOKE EXECUTE ON FUNCTIONS FROM %s',
+        v_browser_roles
+      );
+    END IF;
   END IF;
 END
 $security$;
