@@ -1,4 +1,8 @@
+import { useState } from "react";
 import OrdersPage from "../pages/OrdersPage";
+import IngredientsPage from "./pages/IngredientsPage";
+import RecipesPage from "./pages/RecipesPage";
+import PurchasesPage from "./pages/PurchasesPage";
 import { AuthProvider, useAuth } from "./auth/AuthContext";
 import LoginPage from "./auth/LoginPage";
 import SetPasswordPage from "./auth/SetPasswordPage";
@@ -7,6 +11,7 @@ import "./auth/auth-extra.css";
 
 function AdminGate() {
   const { session, loading, passwordRecovery, signOut } = useAuth();
+  const [activeSection, setActiveSection] = useState<"orders" | "ingredients" | "recipes" | "purchases">("orders");
 
   if (!isSupabaseConfigured) {
     return (
@@ -40,11 +45,46 @@ function AdminGate() {
 
   if (!session) return <LoginPage />;
 
+  if (activeSection === "recipes") {
+    return (
+      <RecipesPage
+        accessToken={session.access_token}
+        signedInEmail={session.user.email ?? "Staff"}
+        onBackToOrders={() => setActiveSection("orders")}
+        onSignOut={signOut}
+      />
+    );
+  }
+  if (activeSection === "purchases") {
+    return (
+      <PurchasesPage
+        accessToken={session.access_token}
+        signedInEmail={session.user.email ?? "Staff"}
+        onBackToOrders={() => setActiveSection("orders")}
+        onSignOut={signOut}
+      />
+    );
+  }
+
+  if (activeSection === "ingredients") {
+    return (
+      <IngredientsPage
+        accessToken={session.access_token}
+        signedInEmail={session.user.email ?? "Staff"}
+        onBackToOrders={() => setActiveSection("orders")}
+        onSignOut={signOut}
+      />
+    );
+  }
+
   return (
     <OrdersPage
       accessToken={session.access_token}
       signedInEmail={session.user.email ?? "Staff"}
       onSignOut={signOut}
+      onOpenIngredients={() => setActiveSection("ingredients")}
+      onOpenRecipes={() => setActiveSection("recipes")}
+      onOpenPurchases={() => setActiveSection("purchases")}
     />
   );
 }

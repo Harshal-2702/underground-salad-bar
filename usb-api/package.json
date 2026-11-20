@@ -7,7 +7,9 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
-    "test": "node --import tsx --test src/services/pricing.test.ts src/services/order-delivery.test.ts"
+    "test": "node --import tsx --test src/services/pricing.test.ts src/services/order-delivery.test.ts src/services/ingredient-validation.test.ts src/services/kot.test.ts",
+    "seed:catalogue:local": "node --import tsx src/scripts/seed-ingredient-catalogue.ts",
+    "test:integration:local": "node --import tsx --test src/services/ingredient-catalogue.integration.test.ts src/services/recipe.integration.test.ts src/services/kot.integration.test.ts src/services/leftover-inventory.integration.test.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",

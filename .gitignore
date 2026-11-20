@@ -15,3 +15,7 @@ usb-admin/node_modules/
 coverage/
 
 .prisma/
+# Underground Kitchen OS local backups - never commit
+/.ukos-backups/
+*.bak
+*.dump

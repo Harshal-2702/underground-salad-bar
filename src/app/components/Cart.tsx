@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { X, Trash2, Plus, ArrowRight, CheckCircle2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Bowl, BowlItem } from "./BowlBuilder";
-export const API_URL = "https://usb-api.onrender.com";
+import { API_URL } from "../config";
 
 interface CartProps {
 
