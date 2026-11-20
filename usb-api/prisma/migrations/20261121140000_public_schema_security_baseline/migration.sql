@@ -43,21 +43,6 @@ BEGIN
       v_browser_roles
     );
 
-    -- Supabase-managed objects created as supabase_admin follow the same policy.
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'supabase_admin') THEN
-      EXECUTE format(
-        'ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public REVOKE ALL ON TABLES FROM %s',
-        v_browser_roles
-      );
-      EXECUTE format(
-        'ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public REVOKE ALL ON SEQUENCES FROM %s',
-        v_browser_roles
-      );
-      EXECUTE format(
-        'ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public REVOKE EXECUTE ON FUNCTIONS FROM %s',
-        v_browser_roles
-      );
-    END IF;
   END IF;
 END
 $security$;
