@@ -275,6 +275,118 @@ function getOrderTimer(order: OrderRecord, now: number, settings: KotChannelTimi
   return { label: "STAGE TIME", value: "—", severity: "UNCONFIGURED" as KotTimerSeverity, helper: "No complete timing record" };
 }
 
+
+function escapePrintText(value: string): string {
+  const replacements: Record<string, string> = {
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+  };
+  return value.replace(/[&<>"']/g, (character) => replacements[character] ?? character);
+}
+
+function buildKotPrintHtml(order: OrderRecord, config: KotTemplateConfig): string {
+  const width = config.paperWidth;
+  const contentWidth = width === "80mm" ? "72mm" : "48mm";
+  const margin = config.margin === "narrow" ? "1mm" : config.margin === "wide" ? "4mm" : "2mm";
+  const lineHeight = config.lineSpacing === "compact" ? 1.15 : config.lineSpacing === "relaxed" ? 1.65 : 1.35;
+  const customerName = customerDetails(order).name.trim().split(/\s+/)[0] || "Guest";
+  const receivedAt = dateTimeLabel(order.createdAt);
+  const rows = order.bowls.map((bowl) => {
+    const details = config.showIngredients && bowl.details
+      ? `<div class="details">${escapePrintText(bowl.details).replace(/\r?\n/g, "<br>")}</div>`
+      : "";
+    return `<section class="item">
+      <div class="item-heading"><strong>${escapePrintText(String(bowl.quantity))} × ${escapePrintText(bowl.bowlName)}</strong></div>
+      ${details}
+    </section>`;
+  }).join("");
+  const brand = config.showBrandName && config.headerText.trim()
+    ? `<div class="brand">${escapePrintText(config.headerText.trim())}</div>`
+    : "";
+  const externalReference = config.showExternalOrderReference && order.externalOrderId
+    ? `<div class="meta">External ref: ${escapePrintText(order.externalOrderId)}</div>`
+    : "";
+  const customer = config.showCustomerFirstName
+    ? `<div class="meta">Customer: ${escapePrintText(customerName)}</div>`
+    : "";
+  const instructions = order.specialInstructions?.trim()
+    ? `<section class="special"><strong>Special instructions</strong><div>${escapePrintText(order.specialInstructions).replace(/\r?\n/g, "<br>")}</div></section>`
+    : "";
+  const footer = config.footerText.trim()
+    ? `<div class="footer">${escapePrintText(config.footerText.trim())}</div>`
+    : "";
+  return `<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${escapePrintText(order.kotNumber)}</title>
+<style>
+  @page { size: ${width} auto; margin: 0; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #fff; color: #000; }
+  body { width: ${contentWidth}; padding: ${margin}; font-family: Arial, Helvetica, sans-serif; font-size: ${config.fontSize}px; line-height: ${lineHeight}; font-weight: ${config.headingWeight === "bold" ? 600 : 400}; }
+  .brand { text-align: ${config.alignment}; font-size: 1.15em; font-weight: 800; margin-bottom: 3mm; overflow-wrap: anywhere; }
+  .kot { text-align: ${config.alignment}; font-size: 1.55em; font-weight: 900; letter-spacing: .3px; margin-bottom: 1mm; }
+  .meta { font-size: .9em; margin: .7mm 0; overflow-wrap: anywhere; }
+  .rule { border-top: 1px dashed #000; margin: 2.2mm 0; }
+  .item { padding: 1.4mm 0; border-bottom: 1px dashed #999; break-inside: avoid; }
+  .item-heading { font-size: 1.06em; font-weight: 800; overflow-wrap: anywhere; }
+  .details { margin-top: 1mm; padding-left: 2mm; font-size: .92em; font-weight: 400; overflow-wrap: anywhere; }
+  .special { margin-top: 2.5mm; padding: 2mm; border: 1px solid #000; font-size: .96em; overflow-wrap: anywhere; }
+  .special strong { display: block; text-transform: uppercase; margin-bottom: 1mm; }
+  .footer { text-align: center; border-top: 1px dashed #000; margin-top: 3mm; padding-top: 2mm; font-size: .85em; overflow-wrap: anywhere; }
+  @media screen { body { margin: 8px auto; outline: 1px dashed #bbb; } }
+</style></head><body>
+  ${brand}
+  <div class="kot">${escapePrintText(order.kotNumber)}</div>
+  <div class="rule"></div>
+  <div class="meta"><strong>Source:</strong> ${escapePrintText(channelLabel(order.channel))}</div>
+  <div class="meta"><strong>Received:</strong> ${escapePrintText(receivedAt)}</div>
+  ${externalReference}
+  ${customer}
+  <div class="rule"></div>
+  ${rows || "<div>No items</div>"}
+  ${instructions}
+  ${footer}
+</body></html>`;
+}
+
+function sampleKotOrder(): OrderRecord {
+  return {
+    id: "sample-kot",
+    invoiceNumber: "TEST-KOT",
+    kotNumber: "KOT-TEST-001",
+    channel: "WEBSITE",
+    externalOrderId: null,
+    status: "CONFIRMED",
+    acceptedAt: null,
+    readyAt: null,
+    handedOverAt: null,
+    cancelledAt: null,
+    acceptanceDurationSeconds: null,
+    preparationDurationSeconds: null,
+    total: 0,
+    paymentMethod: "TEST",
+    createdAt: new Date().toISOString(),
+    deliveryName: "Sample Customer",
+    deliveryPhone: null,
+    deliveryAddress: null,
+    deliveryArea: null,
+    deliveryCity: null,
+    specialInstructions: "Please keep the dressing separate.",
+    customer: null,
+    bowls: [{
+      id: "sample-bowl",
+      bowlName: "Continental Bowl",
+      quantity: 1,
+      price: 0,
+      details: ["Rice", "Grilled chicken", "Roasted vegetables", "Pesto dressing"].join("\n"),
+    }],
+    statusEvents: [],
+  };
+}
+
 function timingDefault(): KotChannelTimingSetting[] {
   return (["WEBSITE", "ZOMATO", "SWIGGY"] as OrderChannel[]).map((channel) => ({
     channel,
@@ -321,6 +433,9 @@ export default function OrdersPage({
   const [apiError, setApiError] = useState("");
   const [notice, setNotice] = useState("");
   const [busyOrder, setBusyOrder] = useState(false);
+  const [printingOrderId, setPrintingOrderId] = useState<string | null>(null);
+  const [printError, setPrintError] = useState("");
+  const [printNotice, setPrintNotice] = useState("");
   const [soundEnabled, setSoundEnabled] = useState(false);
   const [clockNow, setClockNow] = useState(() => Date.now());
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -490,8 +605,8 @@ export default function OrdersPage({
   }, [accessToken, onSignOut]);
 
   useEffect(() => {
-    if (view === "designer") void loadTemplate();
-  }, [view, loadTemplate]);
+    void loadTemplate();
+  }, [loadTemplate]);
 
   const loadTimingSettings = useCallback(async () => {
     setTimingSettingsLoading(true);
@@ -602,6 +717,38 @@ export default function OrdersPage({
     }
   };
 
+  const printKot = (order: OrderRecord) => {
+    setPrintError("");
+    setPrintNotice("");
+    const printWindow = window.open("", "_blank", "popup,width=420,height=720");
+    if (!printWindow) {
+      setPrintError("The print window was blocked. Allow pop-ups for the Kitchen OS site, then try again.");
+      return;
+    }
+    setPrintingOrderId(order.id);
+    try {
+      printWindow.document.open();
+      printWindow.document.write(buildKotPrintHtml(order, templateConfig));
+      printWindow.document.close();
+      printWindow.addEventListener("afterprint", () => {
+        printWindow.close();
+        setPrintingOrderId(null);
+      }, { once: true });
+      window.setTimeout(() => {
+        if (!printWindow.closed) {
+          printWindow.focus();
+          printWindow.print();
+          setPrintNotice(`Print dialog opened for ${order.kotNumber}. Choose DCode DCRP30 and confirm the paper output.`);
+          window.setTimeout(() => setPrintingOrderId((current) => current === order.id ? null : current), 60000);
+        }
+      }, 600);
+    } catch (error) {
+      printWindow.close();
+      setPrintingOrderId(null);
+      setPrintError(error instanceof Error ? error.message : "Unable to open the KOT print dialog.");
+    }
+  };
+
   const updateStatus = async (order: OrderRecord, status: OrderStatus) => {
     const actionLabel = status === "CONFIRMED" ? "accept" : status === "OUT_FOR_DELIVERY" ? "mark handed over" : status === "CANCELLED" ? "cancel" : `move to ${statusLabel(status).toLowerCase()}`;
     if (status === "CANCELLED" && !window.confirm(`Cancel ${order.kotNumber}? This will remain in today's order history.`)) return;
@@ -683,7 +830,7 @@ export default function OrdersPage({
           <div>
             <p className="kot-eyebrow">UNDERGROUND KITCHEN OS</p>
             <h1>KOT Designer</h1>
-            <p className="kot-muted">Configure the kitchen ticket layout. Physical printing will be enabled in a later milestone.</p>
+            <p className="kot-muted">Design and print KOTs using the Windows driver. Silent automatic printing remains disabled.</p>
           </div>
           <div className="kot-header-actions">
             <button className="kot-button kot-button-secondary" onClick={() => setView("orders")}>Back to orders</button>
@@ -693,6 +840,8 @@ export default function OrdersPage({
 
         {templateError && <ApiError>{templateError}</ApiError>}
         {templateNotice && <div className="kot-alert kot-alert-success" role="status">{templateNotice}</div>}
+        {printError && <ApiError>{printError}</ApiError>}
+        {printNotice && <div className="kot-alert kot-alert-success" role="status">{printNotice}</div>}
 
         {templateLoading ? (
           <div className="kot-empty"><div className="kot-spinner"/>Loading template settings…</div>
@@ -798,18 +947,21 @@ export default function OrdersPage({
               </div>
 
               <div className="kot-panel kot-readiness-panel">
-                <div className="kot-panel-heading"><div><h2>Kitchen print settings</h2><p>Prepared now; physical printing is a later milestone.</p></div></div>
+                <div className="kot-panel-heading"><div><h2>Kitchen print settings</h2><p>Manual printing uses the Windows driver; silent printing remains disabled.</p></div></div>
                 <div className="kot-readiness-row"><span>Automatic printing</span><label className="kot-disabled-switch"><input type="checkbox" disabled/><strong>OFF · KOT-03</strong></label></div>
-                <div className="kot-readiness-row"><span>Print trigger</span><strong>After staff acceptance</strong></div>
-                <div className="kot-readiness-row"><span>Printer</span><strong>Not configured</strong></div>
+                <div className="kot-readiness-row"><span>Planned auto-print trigger</span><strong>After staff acceptance</strong></div>
+                <div className="kot-readiness-row"><span>Printer</span><strong>DCode DCRP30 · Windows driver</strong></div>
                 <div className="kot-readiness-row"><span>Default paper preview</span><strong>{templateConfig.paperWidth}</strong></div>
                 <div className="kot-readiness-row"><span>Website channel</span><strong className="kot-ready-text">Existing order flow</strong></div>
                 <div className="kot-readiness-row"><span>Zomato</span><strong className="kot-pending-text">Integration pending</strong></div>
                 <div className="kot-readiness-row"><span>Swiggy</span><strong className="kot-pending-text">Integration pending</strong></div>
               </div>
               <div className="kot-note-card">
-                <strong>Printing is not enabled in KOT-01.</strong>
-                <p>This milestone saves the design and prepares the KOT data. Manual printing, printer connection and automatic printing will be implemented and tested in KOT-02 and KOT-03.</p>
+                <strong>Manual printing test</strong>
+                <p>Print a sample ticket through the Windows printer driver. This opens the browser print dialog; automatic silent printing remains disabled until the local print bridge is installed and tested.</p>
+                <button type="button" className="kot-button kot-button-primary kot-print-sample" onClick={() => printKot(sampleKotOrder())} disabled={printingOrderId !== null || templateLoading}>
+                  {printingOrderId === "sample-kot" ? "Opening print dialog…" : "Print sample KOT"}
+                </button>
               </div>
             </section>
           </form>
@@ -844,6 +996,8 @@ export default function OrdersPage({
 
       {apiError && <ApiError>{apiError}</ApiError>}
       {notice && <div className="kot-alert kot-alert-success" role="status">{notice}</div>}
+      {printError && <ApiError>{printError}</ApiError>}
+      {printNotice && <div className="kot-alert kot-alert-success" role="status">{printNotice}</div>}
 
       <section className="kot-stat-grid" aria-label="Today's order status counts">
         <div className="kot-stat-card"><span>New</span><strong>{countNew}</strong><small>Awaiting acceptance</small></div>
@@ -861,7 +1015,7 @@ export default function OrdersPage({
             <label className="kot-sound-toggle"><input type="checkbox" checked={soundEnabled} onChange={(event) => handleSoundToggle(event.target.checked)}/> Sound alerts</label>
             <label className="kot-auto-print-toggle" title="Automatic printing becomes available after printer setup in KOT-02 and print-service activation in KOT-03.">
               <input type="checkbox" checked={false} disabled aria-label="Automatic printing unavailable until printer setup"/>
-              <span>Auto-print</span><small>OFF · printer setup pending</small>
+              <span>Auto-print</span><small>OFF · manual only</small>
             </label>
             <div className="kot-timing-utility" ref={timingPopoverRef}>
               <button
@@ -1008,6 +1162,7 @@ export default function OrdersPage({
                       {order.status === "PENDING" && <button className="kot-button kot-button-primary kot-card-action" disabled={busyOrder} onClick={() => void updateStatus(order, "CONFIRMED")}>Accept</button>}
                       {(order.status === "CONFIRMED" || order.status === "PREPARING") && <button className="kot-button kot-button-primary kot-card-action" disabled={busyOrder} onClick={() => void updateStatus(order, "READY")}>Mark ready</button>}
                       {order.status === "READY" && <button className="kot-button kot-button-secondary kot-card-action" disabled={busyOrder} onClick={() => void updateStatus(order, "OUT_FOR_DELIVERY")}>Handed over</button>}
+                      <button type="button" className="kot-button kot-button-secondary kot-card-action kot-print-action" disabled={printingOrderId !== null || templateLoading} onClick={() => printKot(order)}>{printingOrderId === order.id ? "Printing…" : "Print KOT"}</button>
                       {order.status === "CANCELLED" && <span className="kot-card-terminal">Cancelled</span>}
                       {(order.status === "OUT_FOR_DELIVERY" || order.status === "DELIVERED") && <span className="kot-card-terminal">Handed over</span>}
                     </div>
@@ -1079,6 +1234,7 @@ export default function OrdersPage({
                 )}
               </div>
               <div className="kot-order-actions">
+                <button type="button" className="kot-button kot-button-secondary" disabled={printingOrderId !== null || templateLoading} onClick={() => printKot(selectedOrder)}>{printingOrderId === selectedOrder.id ? "Printing…" : "Print KOT"}</button>
                 {selectedOrder.status === "PENDING" && <button className="kot-button kot-button-primary" disabled={busyOrder} onClick={() => void updateStatus(selectedOrder, "CONFIRMED")}>Accept order</button>}
                 {(selectedOrder.status === "CONFIRMED" || selectedOrder.status === "PREPARING") && <button className="kot-button kot-button-primary" disabled={busyOrder} onClick={() => void updateStatus(selectedOrder, "READY")}>Mark ready</button>}
                 {selectedOrder.status === "READY" && <button className="kot-button kot-button-primary" disabled={busyOrder} onClick={() => void updateStatus(selectedOrder, "OUT_FOR_DELIVERY")}>Handed over</button>}
@@ -1087,7 +1243,7 @@ export default function OrdersPage({
                 {selectedOrder.status === "DELIVERED" && <span className="kot-completion-note">Order completed.</span>}
                 {selectedOrder.status === "CANCELLED" && <span className="kot-completion-note">Order cancelled.</span>}
                 <div className="kot-total">Order total <strong>₹{selectedOrder.total.toFixed(2)}</strong></div>
-                <p className="kot-helper">KOT printing will be enabled in a later milestone. Accepting an order does not print anything in KOT-01.</p>
+                <p className="kot-helper">Print KOT opens the Windows print dialog. Choose DCode DCRP30. Automatic printing remains off.</p>
               </div>
             </div>
           </aside>
