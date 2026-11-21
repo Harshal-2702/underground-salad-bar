@@ -1315,22 +1315,61 @@ export default function OrdersPage({
 
             <section className="kot-preview-column">
               <div className="kot-panel">
-                <div className="kot-panel-heading"><div><h2>Live preview</h2><p>Sample data only — no real order is changed.</p></div><span className="kot-preview-tag">PREVIEW</span></div>
+                <div className="kot-panel-heading">
+                  <div><h2>Live {activeTemplateType === "CUSTOMER" ? "customer receipt" : "kitchen ticket"} preview</h2><p>Sample data only — no real order is changed.</p></div>
+                  <span className="kot-preview-tag">{activeTemplateType} · PREVIEW</span>
+                </div>
+                {activeTemplateType === "CUSTOMER" && <p className="kot-preview-hint">This is the detailed slip to accompany the order. Prices are sourced from the server-calculated order.</p>}
+                {activeTemplateType === "KITCHEN" && <p className="kot-preview-hint">This is the kitchen preparation slip. No price, phone number or delivery address is printed.</p>}
                 <div className="kot-paper-stage">
                   <article className={`kot-paper kot-paper-${templateConfig.paperWidth === "80mm" ? "80" : "58"} kot-paper-margin-${templateConfig.margin} kot-paper-heading-${templateConfig.headingWeight}`} style={{ fontSize: `${templateConfig.fontSize}px`, lineHeight: templateConfig.lineSpacing === "compact" ? 1.2 : templateConfig.lineSpacing === "relaxed" ? 1.65 : 1.4, textAlign: templateConfig.alignment }}>
-                    {templateConfig.showBrandName && <div className="kot-paper-brand">{templateConfig.headerText || "UNDERGROUND KITCHEN"}</div>}
-                    {templateConfig.showKotNumber && <div className="kot-paper-number">KOT-20261111-001</div>}
-                    {templateConfig.showChannel && <div className="kot-paper-meta">WEBSITE · 09:42 AM</div>}
-                    {templateConfig.showExternalOrderReference && <div className="kot-paper-meta">ORDER #128</div>}
-                    {templateConfig.showCustomerFirstName && <div className="kot-paper-meta">CUSTOMER: HARSHAL</div>}
-                    <div className="kot-paper-rule"/>
-                    {templateConfig.showItems && <>
-                      <div className="kot-paper-item-title">2 × MEXICAN CHICKEN BOWL</div>
-                      {templateConfig.showIngredients && <div className="kot-paper-details">BASE: Rice<br/>PROTEIN: Chicken<br/>VEGGIES: Lettuce, Corn, Onion<br/>DRESSING: Chipotle</div>}
-                    </>}
-                    <div className="kot-paper-rule"/>
-                    <div className="kot-paper-special">SPECIAL INSTRUCTIONS<br/>Extra dressing on the side.</div>
-                    {templateConfig.footerText && <div className="kot-paper-footer">{templateConfig.footerText}</div>}
+                    {templateConfig.sectionOrder.map((section) => {
+                      const sample = sampleKotOrder();
+                      const sampleCustomer = customerDetails(sample);
+                      const sampleSubtotal = sample.bowls.reduce((sum, bowl) => sum + bowl.price, 0);
+                      const sectionDivider = <div className="kot-paper-section-divider"/>;
+                      switch (section) {
+                        case "order":
+                          return <div className="kot-paper-section" key={section}>
+                            {templateConfig.showBrandName && <div className="kot-paper-brand">{templateConfig.headerText || "UNDERGROUND KITCHEN"}</div>}
+                            <div className="kot-paper-copy-kind">{activeTemplateType === "CUSTOMER" ? "CUSTOMER COPY" : "KITCHEN COPY"}</div>
+                            <div className="kot-paper-number">{sample.kotNumber}</div>
+                            <div className="kot-paper-meta">WEBSITE · {timeLabel(sample.createdAt)}</div>
+                            {templateConfig.showExternalOrderReference && <div className="kot-paper-meta">External ref: —</div>}
+                            {activeTemplateType === "CUSTOMER" && templateConfig.showInvoiceNumber && <div className="kot-paper-meta">Invoice: {sample.invoiceNumber}</div>}
+                          </div>;
+                        case "customer":
+                          return <div className="kot-paper-section" key={section}>
+                            {templateConfig.showCustomerFirstName && <div className="kot-paper-customer-name">Customer: {sampleCustomer.name}</div>}
+                            {activeTemplateType === "CUSTOMER" && templateConfig.showCustomerPhone && <div className="kot-paper-meta">Phone: {sampleCustomer.phone}</div>}
+                            {activeTemplateType === "CUSTOMER" && templateConfig.showDeliveryAddress && <div className="kot-paper-meta">Delivery: {sampleCustomer.address}, {sampleCustomer.area}, {sampleCustomer.city}</div>}
+                          </div>;
+                        case "items":
+                          return <div className="kot-paper-section" key={section}>
+                            {sample.bowls.map((bowl) => <div className="kot-paper-item" key={bowl.id}>
+                              <div className="kot-paper-item-row"><strong>{bowl.quantity} × {bowl.bowlName}</strong>{activeTemplateType === "CUSTOMER" && templateConfig.showItemPrices && <strong>₹{bowl.price.toFixed(2)}</strong>}</div>
+                              {templateConfig.showIngredients && bowl.details && <div className="kot-paper-details">{bowl.details.split("\n").map((line) => <div key={line}>{line}</div>)}</div>}
+                            </div>)}
+                          </div>;
+                        case "totals":
+                          return activeTemplateType === "CUSTOMER" ? <div className="kot-paper-section" key={section}>
+                            {templateConfig.showSubtotal && <div className="kot-paper-total-row"><span>Items subtotal</span><strong>₹{sampleSubtotal.toFixed(2)}</strong></div>}
+                            {templateConfig.showDeliveryCharge && <div className="kot-paper-total-row"><span>Delivery</span><strong>₹{sample.deliveryCharge?.toFixed(2)}</strong></div>}
+                            {templateConfig.showTotal && <div className="kot-paper-grand-total"><span>AMOUNT PAYABLE</span><strong>₹{sample.total.toFixed(2)}</strong></div>}
+                            {templateConfig.showPaymentMethod && <div className="kot-paper-meta">Payment: {sample.paymentMethod}</div>}
+                          </div> : <div key={section}/>;
+                        case "special":
+                          return <div className="kot-paper-section" key={section}><div className="kot-paper-special"><strong>Special instructions</strong><div>{sample.specialInstructions}</div></div></div>;
+                        case "footer":
+                          return <div className="kot-paper-section" key={section}>{templateConfig.footerText && <div className="kot-paper-footer">{templateConfig.footerText}</div>}</div>;
+                        default:
+                          return <div key={section}/>;
+                      }
+                    }).reduce<ReactNode[]>((nodes, node, index) => {
+                      if (index > 0) nodes.push(<div className="kot-paper-section-divider" key={`divider-${index}`}/>);
+                      nodes.push(node);
+                      return nodes;
+                    }, [])}
                   </article>
                 </div>
               </div>
