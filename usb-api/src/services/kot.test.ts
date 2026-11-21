@@ -2,7 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { OrderStatus } from "@prisma/client";
 import {
-  DEFAULT_KOT_TEMPLATE,\n  DEFAULT_CUSTOMER_KOT_TEMPLATE,
+  DEFAULT_KOT_TEMPLATE,
+  DEFAULT_CUSTOMER_KOT_TEMPLATE,
   getIndiaBusinessDate,
   getIndiaDateRange,
   isDateKey,
