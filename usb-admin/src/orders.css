@@ -196,3 +196,39 @@
 .kot-timing-popover-footer .kot-button{padding:8px 12px;font-size:11px}
 @media(max-width:900px){.kot-timing-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:680px){.kot-card-operations{grid-template-columns:1fr;gap:7px}.kot-card-actions{justify-content:stretch}.kot-card-action{width:100%}.kot-timing-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.kot-timing-popover{position:fixed;top:112px;left:10px;right:10px;width:auto;max-height:calc(100vh - 128px);z-index:1300}.kot-timing-popover-heading{display:none}.kot-timing-popover-row{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}.kot-timing-popover-channel{grid-column:1/-1}.kot-timing-popover-stage{gap:8px}.kot-timing-popover-footer{align-items:flex-end}.kot-timing-popover-footer p{max-width:48%}}
+
+
+/* Dual-copy ticket designer: distinct templates, draggable sections and live receipt preview. */
+.kot-template-tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 0 18px}
+.kot-template-tabs button{display:grid;gap:4px;text-align:left;padding:12px 13px;border:1px solid #dce4db;border-radius:10px;background:#fbfcfa;color:#344a38;cursor:pointer}
+.kot-template-tabs button strong{font-size:12px}
+.kot-template-tabs button small{font-size:10px;color:#839087}
+.kot-template-tabs button.is-active{border-color:#63866a;background:#eef5ee;box-shadow:inset 0 0 0 1px #63866a}
+.kot-section-organizer{display:grid;gap:7px;margin-top:8px}
+.kot-section-row{display:grid;grid-template-columns:17px 23px minmax(0,1fr) auto;align-items:center;gap:8px;min-height:43px;padding:6px 7px;background:#fbfcfa;border:1px solid #e4eae2;border-radius:8px;color:#425347;cursor:grab;transition:border-color .12s,background .12s,opacity .12s}
+.kot-section-row:active{cursor:grabbing}
+.kot-section-row.is-dragging{opacity:.45}
+.kot-section-row.is-drop-target{border-color:#63866a;background:#eff6ef;box-shadow:0 0 0 2px rgba(99,134,106,.12)}
+.kot-section-grip{font-size:17px;color:#809087;line-height:1}
+.kot-section-index{display:grid;place-items:center;width:21px;height:21px;border-radius:6px;background:#e9efe8;color:#5a725e;font-size:10px;font-weight:800}
+.kot-section-row>strong{font-size:11px;font-weight:700}
+.kot-section-actions{display:flex;align-items:center;gap:4px}
+.kot-section-actions .kot-icon-button{padding:3px 7px;min-width:26px;line-height:1.2}
+.kot-section-actions .kot-icon-button:disabled{opacity:.3;cursor:not-allowed}
+.kot-preview-hint{margin:-7px 0 12px;color:#7b877e;font-size:10px;line-height:1.45}
+.kot-paper-section+.kot-paper-section{border-top:1px dashed #9ca49c;margin-top:8px;padding-top:8px}
+.kot-paper-copy-kind{text-align:center;font-size:.68em;letter-spacing:.7px;font-weight:800;margin:0 0 3px;color:#39443b}
+.kot-paper-customer-name{font-weight:800;font-size:1.08em;margin:2px 0}
+.kot-paper-item{padding:5px 0;border-bottom:1px dashed #c6ccc5}
+.kot-paper-item-row{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;font-size:1.03em}
+.kot-paper-item-row strong{font-weight:850}
+.kot-paper-details{font-size:.9em;line-height:1.45;margin-top:4px;color:#454d46}
+.kot-paper-total-row{display:flex;justify-content:space-between;gap:8px;padding:3px 0;font-size:.9em}
+.kot-paper-grand-total{display:flex;justify-content:space-between;gap:8px;padding:7px 0;margin:6px 0;border-top:1px solid #222;border-bottom:1px solid #222;font-size:1.08em;font-weight:900}
+.kot-paper-special{padding:6px;border:1px solid #333;border-radius:3px;font-size:.92em}
+.kot-paper-special strong{display:block;text-transform:uppercase;margin-bottom:3px}
+@media(max-width:680px){
+  .kot-template-tabs button{padding:10px}
+  .kot-section-row{grid-template-columns:15px 21px minmax(0,1fr) auto;gap:6px}
+  .kot-section-actions .kot-icon-button{min-width:24px;padding:3px 5px}
+}
