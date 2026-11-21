@@ -2,13 +2,13 @@
 
 This setup enables silent printing from the Kitchen OS Admin page using the existing Windows printer driver. It does not install a cloud printer service and does not change customer checkout or server-side order handling.
 
-## 1. Set the DCode printer as the Windows default
+## 1. Set the POS-80C printer as the Windows default
 
-1. Connect and power on the DCode DCRP30.
+1. Connect and power on the POS-80C.
 2. In Windows, open **Settings → Bluetooth & devices → Printers & scanners**.
-3. Open **DCode DCRP30** and choose **Set as default**.
+3. Open **POS-80C** and choose **Set as default**.
 4. Turn off **Let Windows manage my default printer** on the Printers & scanners page, if that option is enabled.
-5. Print a Windows test page and confirm that the correct roll width and orientation are selected in the DCode driver.
+5. Print a Windows test page and confirm that the correct roll width and orientation are selected in the POS-80C Windows driver.
 
 Chrome kiosk printing sends all print jobs from that Chrome instance to the Windows default printer without showing the print dialog. Do not use this dedicated browser shortcut for normal browsing or documents you expect to inspect before printing.
 
@@ -35,7 +35,7 @@ If Chrome is installed in a different location, browse to its actual `chrome.exe
 2. Save the KOT template at **80mm** paper width.
 3. Switch **Auto-print** ON. The setting is saved in this browser profile.
 4. Choose **Print sample KOT silently**.
-5. Confirm that the DCode DCRP30 prints the sample without showing the browser print dialog.
+5. Confirm that the POS-80C prints the sample without showing the browser print dialog.
 6. Only after the sample prints correctly, use a clearly labelled test order and click **Accept**. Its KOT should print automatically.
 
 ## Important behaviour
