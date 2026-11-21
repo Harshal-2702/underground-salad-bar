@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { OrderStatus } from "@prisma/client";
 import {
   DEFAULT_KOT_TEMPLATE,
+  DEFAULT_CUSTOMER_KOT_TEMPLATE,
   getIndiaBusinessDate,
   getIndiaDateRange,
   isDateKey,
@@ -47,6 +48,46 @@ test("KOT template validation enforces required ticket content", () => {
   assert.equal(config.showReceivedAt, true);
   assert.equal(config.showItems, true);
   assert.equal(config.showSpecialInstructions, true);
+});
+
+test("customer and kitchen copies validate independently with different privacy rules", () => {
+  const customer = validateKotTemplateConfig({ ...DEFAULT_CUSTOMER_KOT_TEMPLATE }, "CUSTOMER");
+  assert.equal(customer.showItemPrices, true);
+  assert.equal(customer.showSubtotal, true);
+  assert.equal(customer.showDeliveryCharge, true);
+  assert.equal(customer.showTotal, true);
+  assert.equal(customer.showPaymentMethod, true);
+
+  const kitchen = validateKotTemplateConfig({
+    ...DEFAULT_KOT_TEMPLATE,
+    showCustomerPhone: true,
+    showDeliveryAddress: true,
+    showItemPrices: true,
+    showSubtotal: true,
+    showDeliveryCharge: true,
+    showPaymentMethod: true,
+  }, "KITCHEN");
+  assert.equal(kitchen.showCustomerPhone, false);
+  assert.equal(kitchen.showDeliveryAddress, false);
+  assert.equal(kitchen.showItemPrices, false);
+  assert.equal(kitchen.showSubtotal, false);
+  assert.equal(kitchen.showDeliveryCharge, false);
+  assert.equal(kitchen.showPaymentMethod, false);
+  assert.equal(kitchen.showTotal, false);
+});
+
+test("customer copy cannot hide amount payable and each section must appear once", () => {
+  assert.throws(
+    () => validateKotTemplateConfig({ ...DEFAULT_CUSTOMER_KOT_TEMPLATE, showTotal: false }, "CUSTOMER"),
+    KotValidationError,
+  );
+  assert.throws(
+    () => validateKotTemplateConfig({
+      ...DEFAULT_KOT_TEMPLATE,
+      sectionOrder: ["order", "customer", "items", "totals", "special", "special"],
+    }),
+    KotValidationError,
+  );
 });
 
 test("KOT template validation rejects unsafe printer values", () => {
