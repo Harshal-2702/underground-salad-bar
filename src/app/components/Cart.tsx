@@ -501,7 +501,8 @@ setView("success");
                       <input
                         type="text"
                         autoComplete="given-name"
-                        placeholder="Rahul"\n                        maxLength={50}
+                        placeholder="Rahul"
+                        maxLength={50}
                         value={form.firstName}
                         onChange={e => { setForm(f => ({ ...f, firstName: e.target.value })); setErrors(err => ({ ...err, firstName: '' })); }}
                         className={`w-full px-4 py-3 rounded-xl border font-['Sora'] text-sm bg-white outline-none transition-colors ${errors.firstName ? 'border-red-400' : 'border-[#1A1209]/15 focus:border-[#1F3D2B]'}`}
@@ -513,7 +514,8 @@ setView("success");
                       <input
                         type="text"
                         autoComplete="family-name"
-                        placeholder="Sharma"\n                        maxLength={50}
+                        placeholder="Sharma"
+                        maxLength={50}
                         value={form.lastName}
                         onChange={e => { setForm(f => ({ ...f, lastName: e.target.value })); setErrors(err => ({ ...err, lastName: '' })); }}
                         className={`w-full px-4 py-3 rounded-xl border font-['Sora'] text-sm bg-white outline-none transition-colors ${errors.lastName ? 'border-red-400' : 'border-[#1A1209]/15 focus:border-[#1F3D2B]'}`}
