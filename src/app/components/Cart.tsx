@@ -501,7 +501,7 @@ setView("success");
                       <input
                         type="text"
                         autoComplete="given-name"
-                        placeholder="Rahul"
+                        placeholder="Rahul"\n                        maxLength={50}
                         value={form.firstName}
                         onChange={e => { setForm(f => ({ ...f, firstName: e.target.value })); setErrors(err => ({ ...err, firstName: '' })); }}
                         className={`w-full px-4 py-3 rounded-xl border font-['Sora'] text-sm bg-white outline-none transition-colors ${errors.firstName ? 'border-red-400' : 'border-[#1A1209]/15 focus:border-[#1F3D2B]'}`}
@@ -513,7 +513,7 @@ setView("success");
                       <input
                         type="text"
                         autoComplete="family-name"
-                        placeholder="Sharma"
+                        placeholder="Sharma"\n                        maxLength={50}
                         value={form.lastName}
                         onChange={e => { setForm(f => ({ ...f, lastName: e.target.value })); setErrors(err => ({ ...err, lastName: '' })); }}
                         className={`w-full px-4 py-3 rounded-xl border font-['Sora'] text-sm bg-white outline-none transition-colors ${errors.lastName ? 'border-red-400' : 'border-[#1A1209]/15 focus:border-[#1F3D2B]'}`}
@@ -627,7 +627,7 @@ setView("success");
                 </p>
               )}
               <p className="font-['Sora'] text-[#1A1209]/60 text-sm mb-2 leading-relaxed">
-                Hi {form.name || 'there'}! We'll call you at {form.phone || 'your number'} once your bowl is on the way.
+                Hi {[form.firstName, form.lastName].map((part) => part.trim()).filter(Boolean).join(' ') || 'there'}! We'll call you at {form.phone || 'your number'} once your bowl is on the way.
               </p>
               <p className="font-['Sora'] text-[#1A1209]/40 text-xs mb-10">
                 Estimated delivery: 25–35 minutes to {form.area || 'your area'}, Pune
