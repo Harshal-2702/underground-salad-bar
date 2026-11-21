@@ -3,6 +3,7 @@ name: Release candidate validation
 on:
   push:
     branches:
+      - release/production-*
       - release/production-purchase-register
       - staging-api-inventory-purchase
       - staging
