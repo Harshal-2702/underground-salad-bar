@@ -833,8 +833,12 @@ export default function OrdersPage({
           if (!sample) {
             autoPrintedKotIdsRef.current.add(order.id);
             const savedIds = [...autoPrintedKotIdsRef.current].slice(-500);
-            window.localStorage.setItem("ukos.kot.autoPrintedIds.v1", JSON.stringify(savedIds));
-            setAutoPrintNotice(`Auto-print sent ${order.kotNumber} to the Windows default printer.`);
+            try {
+              window.localStorage.setItem("ukos.kot.autoPrintedIds.v1", JSON.stringify(savedIds));
+              setAutoPrintNotice(`Auto-print sent ${order.kotNumber} to the Windows default printer.`);
+            } catch {
+              setAutoPrintNotice(`Auto-print sent ${order.kotNumber}, but this browser could not persist duplicate-print history. Keep this tab open for the current session.`);
+            }
           } else {
             setAutoPrintNotice("Sample KOT sent to the Windows default printer.");
           }
