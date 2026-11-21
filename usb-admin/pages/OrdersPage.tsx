@@ -40,6 +40,7 @@ type OrderRecord = {
   acceptanceDurationSeconds: number | null;
   preparationDurationSeconds: number | null;
   total: number;
+  deliveryCharge: number | null;
   paymentMethod: string;
   createdAt: string;
   deliveryName: string | null;
@@ -196,11 +197,6 @@ function shiftDate(dateKey: string, days: number): string {
   const date = new Date(`${dateKey}T12:00:00.000Z`);
   date.setUTCDate(date.getUTCDate() + days);
   return date.toISOString().slice(0, 10);
-}
-
-function firstName(value: string | null | undefined): string {
-  const trimmed = value?.trim();
-  return trimmed ? trimmed.split(/\s+/)[0] : "Guest";
 }
 
 function customerDetails(order: OrderRecord) {
@@ -1327,7 +1323,6 @@ export default function OrdersPage({
                       const sample = sampleKotOrder();
                       const sampleCustomer = customerDetails(sample);
                       const sampleSubtotal = sample.bowls.reduce((sum, bowl) => sum + bowl.price, 0);
-                      const sectionDivider = <div className="kot-paper-section-divider"/>;
                       switch (section) {
                         case "order":
                           return <div className="kot-paper-section" key={section}>
@@ -1402,8 +1397,8 @@ export default function OrdersPage({
               <div className="kot-note-card">
                 <strong>Printer test</strong>
                 <p>{autoPrintEnabled ? "Send a sample ticket through Chrome silent printing. Confirm that it prints without a browser dialog." : "Print a sample ticket through the Windows printer driver. This opens the browser print dialog; enable Auto-print and use the dedicated Chrome kiosk shortcut to test silent printing."}</p>
-                <button type="button" className="kot-button kot-button-primary kot-print-sample" onClick={() => autoPrintEnabled ? printKotAutomatically(sampleKotOrder(), true) : printKot(sampleKotOrder())} disabled={printingOrderId !== null || templateLoading}>
-                  {printingOrderId === "sample-kot" ? "Sending sample…" : autoPrintEnabled ? "Print sample KOT silently" : "Print sample KOT"}
+                <button type="button" className="kot-button kot-button-primary kot-print-sample" onClick={() => autoPrintEnabled ? printKotAutomatically(sampleKotOrder(), true) : printKot(sampleKotOrder(), activeTemplateType)} disabled={printingOrderId !== null || templateLoading}>
+                  {printingOrderId === "sample-kot" ? "Sending sample…" : autoPrintEnabled ? "Print this copy silently" : "Print this copy"}
                 </button>
               </div>
             </section>
@@ -1585,7 +1580,7 @@ export default function OrdersPage({
                     <span className={`kot-channel kot-channel-${order.channel.toLowerCase()}`}>{channelLabel(order.channel)}</span>
                     {order.status === "PENDING" && <span className="kot-new-dot">NEW</span>}
                   </div>
-                  <div className="kot-order-customer">{firstName(customer.name)} <span>· {timeLabel(order.createdAt)}</span></div>
+                  <div className="kot-order-customer">{customer.name.trim() || "Guest"} <span>· {timeLabel(order.createdAt)}</span></div>
                   <div className="kot-order-items">{order.bowls.map((bowl) => `${bowl.quantity} × ${bowl.bowlName}`).join(" · ") || "Order items pending"}</div>
                 </div>
                 <div className="kot-order-meta">
@@ -1606,7 +1601,7 @@ export default function OrdersPage({
                       {order.status === "PENDING" && <button className="kot-button kot-button-primary kot-card-action" disabled={busyOrder} onClick={() => void updateStatus(order, "CONFIRMED")}>Accept</button>}
                       {(order.status === "CONFIRMED" || order.status === "PREPARING") && <button className="kot-button kot-button-primary kot-card-action" disabled={busyOrder} onClick={() => void updateStatus(order, "READY")}>Mark ready</button>}
                       {order.status === "READY" && <button className="kot-button kot-button-secondary kot-card-action" disabled={busyOrder} onClick={() => void updateStatus(order, "OUT_FOR_DELIVERY")}>Handed over</button>}
-                      <button type="button" className="kot-button kot-button-secondary kot-card-action kot-print-action" disabled={printingOrderId !== null || templateLoading} onClick={() => printKot(order)}>{printingOrderId === order.id ? "Printing…" : "Print KOT"}</button>
+                      <button type="button" className="kot-button kot-button-secondary kot-card-action kot-print-action" disabled={printingOrderId !== null || templateLoading} onClick={() => printBothKotCopies(order)}>{printingOrderId === order.id ? "Printing…" : "Print both"}</button>
                       {order.status === "CANCELLED" && <span className="kot-card-terminal">Cancelled</span>}
                       {(order.status === "OUT_FOR_DELIVERY" || order.status === "DELIVERED") && <span className="kot-card-terminal">Handed over</span>}
                     </div>
@@ -1678,7 +1673,9 @@ export default function OrdersPage({
                 )}
               </div>
               <div className="kot-order-actions">
-                <button type="button" className="kot-button kot-button-secondary" disabled={printingOrderId !== null || templateLoading} onClick={() => printKot(selectedOrder)}>{printingOrderId === selectedOrder.id ? "Printing…" : "Print KOT"}</button>
+                <button type="button" className="kot-button kot-button-primary" disabled={printingOrderId !== null || templateLoading} onClick={() => printBothKotCopies(selectedOrder)}>{printingOrderId === selectedOrder.id ? "Printing…" : "Print both copies"}</button>
+                <button type="button" className="kot-button kot-button-secondary" disabled={printingOrderId !== null || templateLoading} onClick={() => printKot(selectedOrder, "CUSTOMER")}>Customer receipt</button>
+                <button type="button" className="kot-button kot-button-secondary" disabled={printingOrderId !== null || templateLoading} onClick={() => printKot(selectedOrder, "KITCHEN")}>Kitchen ticket</button>
                 {selectedOrder.status === "PENDING" && <button className="kot-button kot-button-primary" disabled={busyOrder} onClick={() => void updateStatus(selectedOrder, "CONFIRMED")}>Accept order</button>}
                 {(selectedOrder.status === "CONFIRMED" || selectedOrder.status === "PREPARING") && <button className="kot-button kot-button-primary" disabled={busyOrder} onClick={() => void updateStatus(selectedOrder, "READY")}>Mark ready</button>}
                 {selectedOrder.status === "READY" && <button className="kot-button kot-button-primary" disabled={busyOrder} onClick={() => void updateStatus(selectedOrder, "OUT_FOR_DELIVERY")}>Handed over</button>}
@@ -1687,7 +1684,7 @@ export default function OrdersPage({
                 {selectedOrder.status === "DELIVERED" && <span className="kot-completion-note">Order completed.</span>}
                 {selectedOrder.status === "CANCELLED" && <span className="kot-completion-note">Order cancelled.</span>}
                 <div className="kot-total">Order total <strong>₹{selectedOrder.total.toFixed(2)}</strong></div>
-                <p className="kot-helper">Print KOT opens the Windows print dialog. Choose DCode DCRP30. Automatic printing remains off.</p>
+                <p className="kot-helper">Accepting an order with Auto-print ON sends both copies: customer receipt first, then kitchen ticket. Manual printing remains available for each copy separately.</p>
               </div>
             </div>
           </aside>
