@@ -343,9 +343,6 @@ function buildKotTicketMarkup(order: OrderRecord, config: KotTemplateConfig, typ
   const deliveryCharge = Math.max(0, Number(order.deliveryCharge ?? 0));
   const itemsSubtotal = order.bowls.reduce((sum, bowl) => sum + Number(bowl.price || 0), 0);
   const money = (amount: number) => `₹${amount.toFixed(2)}`;
-  const lineHeight = config.lineSpacing === "compact" ? 1.15 : config.lineSpacing === "relaxed" ? 1.65 : 1.35;
-  const contentWidth = config.paperWidth === "80mm" ? "72mm" : "48mm";
-  const margin = config.margin === "narrow" ? "1mm" : config.margin === "wide" ? "4mm" : "2mm";
   const brand = config.showBrandName && config.headerText.trim()
     ? `<div class="brand">${escapePrintText(config.headerText.trim())}</div>`
     : "";
@@ -478,22 +475,23 @@ function sampleKotOrder(): OrderRecord {
     cancelledAt: null,
     acceptanceDurationSeconds: null,
     preparationDurationSeconds: null,
-    total: 0,
-    paymentMethod: "TEST",
+    total: 570,
+    deliveryCharge: 50,
+    paymentMethod: "COD",
     createdAt: new Date().toISOString(),
     deliveryName: "Sample Customer",
-    deliveryPhone: null,
-    deliveryAddress: null,
-    deliveryArea: null,
-    deliveryCity: null,
+    deliveryPhone: "9876543210",
+    deliveryAddress: "Flat 4B, Green Tower, MG Road",
+    deliveryArea: "Aundh",
+    deliveryCity: "Pune",
     specialInstructions: "Please keep the dressing separate.",
     customer: null,
     bowls: [{
       id: "sample-bowl",
       bowlName: "Continental Bowl",
-      quantity: 1,
-      price: 0,
-      details: ["Rice", "Grilled chicken", "Roasted vegetables", "Pesto dressing"].join("\n"),
+      quantity: 2,
+      price: 520,
+      details: ["BASE: Rice", "PROTEIN: Grilled chicken", "VEGGIES: Roasted vegetables", "DRESSING: Pesto"].join("\n"),
     }],
     statusEvents: [],
   };
@@ -1215,8 +1213,17 @@ export default function OrdersPage({
           <form className="kot-designer-layout" onSubmit={saveTemplate}>
             <section className="kot-panel kot-designer-controls">
               <div className="kot-panel-heading">
-                <div><h2>Template settings</h2><p>Changes appear in the preview before you save.</p></div>
-                <span className="kot-version-pill">Current v{templateData?.current.versionNumber ?? 0}</span>
+                <div><h2>{activeTemplateType === "CUSTOMER" ? "Customer receipt" : "Kitchen ticket"}</h2><p>{activeTemplateType === "CUSTOMER" ? "Detailed copy with customer details, item prices and amount payable." : "Clean preparation copy: order, customer name, ingredients and instructions. No prices or customer contact details."}</p></div>
+                <span className="kot-version-pill">v{templateData?.current.versionNumber ?? 0}</span>
+              </div>
+
+              <div className="kot-template-tabs" role="tablist" aria-label="Choose ticket design">
+                <button type="button" role="tab" aria-selected={activeTemplateType === "CUSTOMER"} className={activeTemplateType === "CUSTOMER" ? "is-active" : ""} onClick={() => { setActiveTemplateType("CUSTOMER"); setTemplateError(""); setTemplateNotice(""); }}>
+                  <strong>Customer copy</strong><small>Detailed · pricing</small>
+                </button>
+                <button type="button" role="tab" aria-selected={activeTemplateType === "KITCHEN"} className={activeTemplateType === "KITCHEN" ? "is-active" : ""} onClick={() => { setActiveTemplateType("KITCHEN"); setTemplateError(""); setTemplateNotice(""); }}>
+                  <strong>Kitchen copy</strong><small>Preparation · no prices</small>
+                </button>
               </div>
 
               <label className="kot-field-label">Paper width</label>
@@ -1230,7 +1237,6 @@ export default function OrdersPage({
 
               <label className="kot-field-label" htmlFor="kot-header">Header text</label>
               <input id="kot-header" className="kot-input" maxLength={80} value={templateConfig.headerText} onChange={(event) => setTemplateConfig((value) => ({ ...value, headerText: event.target.value }))}/>
-
               <label className="kot-field-label" htmlFor="kot-footer">Footer text</label>
               <input id="kot-footer" className="kot-input" maxLength={160} value={templateConfig.footerText} onChange={(event) => setTemplateConfig((value) => ({ ...value, footerText: event.target.value }))}/>
 
@@ -1255,23 +1261,55 @@ export default function OrdersPage({
                 </select>
               </div>
 
-              <h3 className="kot-subheading">Content visibility</h3>
+              <h3 className="kot-subheading">Arrange ticket sections</h3>
+              <p className="kot-helper">Drag sections into the order you prefer. The arrows also work with touch screens and keyboards.</p>
+              <div className="kot-section-organizer">
+                {templateConfig.sectionOrder.map((section, index) => (
+                  <div
+                    key={section}
+                    draggable
+                    onDragStart={(event) => { event.dataTransfer.effectAllowed = "move"; setDraggedSection(section); }}
+                    onDragOver={(event) => { event.preventDefault(); setDragOverSection(section); }}
+                    onDragLeave={() => setDragOverSection((current) => current === section ? null : current)}
+                    onDrop={(event) => { event.preventDefault(); dropTemplateSection(section); }}
+                    onDragEnd={() => { setDraggedSection(null); setDragOverSection(null); }}
+                    className={`kot-section-row ${draggedSection === section ? "is-dragging" : ""} ${dragOverSection === section ? "is-drop-target" : ""}`}
+                  >
+                    <span className="kot-section-grip" aria-hidden="true">⠿</span>
+                    <span className="kot-section-index">{index + 1}</span>
+                    <strong>{KOT_SECTION_LABELS[section]}</strong>
+                    <span className="kot-section-actions">
+                      <button type="button" className="kot-icon-button" aria-label={`Move ${KOT_SECTION_LABELS[section]} up`} title="Move up" disabled={index === 0} onClick={() => moveTemplateSection(section, index - 1)}>↑</button>
+                      <button type="button" className="kot-icon-button" aria-label={`Move ${KOT_SECTION_LABELS[section]} down`} title="Move down" disabled={index === templateConfig.sectionOrder.length - 1} onClick={() => moveTemplateSection(section, index + 1)}>↓</button>
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              <h3 className="kot-subheading">Content options</h3>
               <div className="kot-toggle-list">
                 <label><span>Brand name</span><input type="checkbox" checked={templateConfig.showBrandName} onChange={(event) => setTemplateConfig((value) => ({ ...value, showBrandName: event.target.checked }))}/></label>
                 <label><span>External order reference</span><input type="checkbox" checked={templateConfig.showExternalOrderReference} onChange={(event) => setTemplateConfig((value) => ({ ...value, showExternalOrderReference: event.target.checked }))}/></label>
-                <label><span>Show customer name</span><input type="checkbox" checked={templateConfig.showCustomerFirstName} onChange={(event) => setTemplateConfig((value) => ({ ...value, showCustomerFirstName: event.target.checked }))}/></label>
+                {activeTemplateType === "CUSTOMER" && <label><span>Invoice number</span><input type="checkbox" checked={templateConfig.showInvoiceNumber} onChange={(event) => setTemplateConfig((value) => ({ ...value, showInvoiceNumber: event.target.checked }))}/></label>}
+                <label><span>Full customer name</span><input type="checkbox" checked={templateConfig.showCustomerFirstName} onChange={(event) => setTemplateConfig((value) => ({ ...value, showCustomerFirstName: event.target.checked }))}/></label>
                 <label><span>Ingredient details</span><input type="checkbox" checked={templateConfig.showIngredients} onChange={(event) => setTemplateConfig((value) => ({ ...value, showIngredients: event.target.checked }))}/></label>
-                <label className="is-locked"><span>KOT number <small>Required</small></span><input type="checkbox" checked disabled/></label>
-                <label className="is-locked"><span>Order source <small>Required</small></span><input type="checkbox" checked disabled/></label>
-                <label className="is-locked"><span>Received time <small>Required</small></span><input type="checkbox" checked disabled/></label>
-                <label className="is-locked"><span>Items and quantities <small>Required</small></span><input type="checkbox" checked disabled/></label>
-                <label className="is-locked"><span>Special instructions <small>Required</small></span><input type="checkbox" checked disabled/></label>
+                {activeTemplateType === "CUSTOMER" && <>
+                  <label><span>Customer phone</span><input type="checkbox" checked={templateConfig.showCustomerPhone} onChange={(event) => setTemplateConfig((value) => ({ ...value, showCustomerPhone: event.target.checked }))}/></label>
+                  <label><span>Delivery address</span><input type="checkbox" checked={templateConfig.showDeliveryAddress} onChange={(event) => setTemplateConfig((value) => ({ ...value, showDeliveryAddress: event.target.checked }))}/></label>
+                  <label><span>Price beside each bowl</span><input type="checkbox" checked={templateConfig.showItemPrices} onChange={(event) => setTemplateConfig((value) => ({ ...value, showItemPrices: event.target.checked }))}/></label>
+                  <label><span>Items subtotal</span><input type="checkbox" checked={templateConfig.showSubtotal} onChange={(event) => setTemplateConfig((value) => ({ ...value, showSubtotal: event.target.checked }))}/></label>
+                  <label><span>Delivery charge</span><input type="checkbox" checked={templateConfig.showDeliveryCharge} onChange={(event) => setTemplateConfig((value) => ({ ...value, showDeliveryCharge: event.target.checked }))}/></label>
+                  <label className="is-locked"><span>Amount payable <small>Required</small></span><input type="checkbox" checked disabled/></label>
+                  <label><span>Payment method</span><input type="checkbox" checked={templateConfig.showPaymentMethod} onChange={(event) => setTemplateConfig((value) => ({ ...value, showPaymentMethod: event.target.checked }))}/></label>
+                </>}
               </div>
-              <p className="kot-helper">Customer phone numbers, addresses and payment details are never included on KOT tickets. A logo upload is not included yet because the Admin project does not currently contain an approved Underground logo asset.</p>
+              {activeTemplateType === "KITCHEN"
+                ? <p className="kot-helper">Kitchen copy is protected from displaying prices, phone numbers, delivery address or payment details.</p>
+                : <p className="kot-helper">Customer copy uses server-calculated item prices, delivery charge and total. Customer phone and address can be toggled for the copy packed with the order.</p>}
 
               <div className="kot-form-actions">
                 <button type="button" className="kot-button kot-button-secondary" onClick={resetTemplate}>Restore default</button>
-                <button type="submit" className="kot-button kot-button-primary" disabled={templateSaving}>{templateSaving ? "Saving…" : "Save new version"}</button>
+                <button type="submit" className="kot-button kot-button-primary" disabled={templateSaving}>{templateSaving ? "Saving…" : "Save this design"}</button>
               </div>
             </section>
 
