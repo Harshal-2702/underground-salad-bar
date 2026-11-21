@@ -768,8 +768,10 @@ export default function OrdersPage({
   const dropTemplateSection = (target: KotSectionId) => {
     if (draggedSection && draggedSection !== target) {
       const currentOrder = templateConfig.sectionOrder;
+      const sourceIndex = currentOrder.indexOf(draggedSection);
       const targetIndex = currentOrder.indexOf(target);
-      moveTemplateSection(draggedSection, targetIndex);
+      const destinationIndex = sourceIndex < targetIndex ? targetIndex - 1 : targetIndex;
+      moveTemplateSection(draggedSection, destinationIndex);
     }
     setDraggedSection(null);
     setDragOverSection(null);
