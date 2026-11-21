@@ -436,6 +436,24 @@ export default function OrdersPage({
   const [printingOrderId, setPrintingOrderId] = useState<string | null>(null);
   const [printError, setPrintError] = useState("");
   const [printNotice, setPrintNotice] = useState("");
+  const [autoPrintEnabled, setAutoPrintEnabled] = useState(() => {
+    try {
+      return window.localStorage.getItem("ukos.kot.autoPrintEnabled.v1") === "true";
+    } catch {
+      return false;
+    }
+  });
+  const [autoPrintNotice, setAutoPrintNotice] = useState("");
+  const autoPrintedKotIdsRef = useRef<Set<string>>((() => {
+    try {
+      const raw = window.localStorage.getItem("ukos.kot.autoPrintedIds.v1");
+      const parsed: unknown = raw ? JSON.parse(raw) : [];
+      return new Set(Array.isArray(parsed) ? parsed.filter((value): value is string => typeof value === "string") : []);
+    } catch {
+      return new Set<string>();
+    }
+  })());
+  const autoPrintingKotIdsRef = useRef<Set<string>>(new Set());
   const [soundEnabled, setSoundEnabled] = useState(false);
   const [clockNow, setClockNow] = useState(() => Date.now());
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -749,6 +767,98 @@ export default function OrdersPage({
     }
   };
 
+  const handleAutoPrintToggle = (enabled: boolean) => {
+    setAutoPrintEnabled(enabled);
+    setAutoPrintNotice(enabled
+      ? "Auto-print enabled on this browser. Use the dedicated Chrome --kiosk-printing shortcut and set DCode DCRP30 as the Windows default printer."
+      : "Auto-print disabled. Orders will require manual printing.");
+    try {
+      window.localStorage.setItem("ukos.kot.autoPrintEnabled.v1", String(enabled));
+    } catch {
+      setAutoPrintNotice("This browser could not save the auto-print setting. Check browser storage permissions.");
+    }
+  };
+
+  const printKotAutomatically = (order: OrderRecord, sample = false) => {
+    if (!sample && !autoPrintEnabled) return;
+    if (!sample && (autoPrintedKotIdsRef.current.has(order.id) || autoPrintingKotIdsRef.current.has(order.id))) {
+      return;
+    }
+
+    if (!sample) autoPrintingKotIdsRef.current.add(order.id);
+    setPrintError("");
+    setAutoPrintNotice("");
+    setPrintingOrderId(order.id);
+
+    const frame = document.createElement("iframe");
+    frame.title = `KOT print job ${order.kotNumber}`;
+    frame.setAttribute("aria-hidden", "true");
+    frame.style.position = "fixed";
+    frame.style.left = "-10000px";
+    frame.style.top = "0";
+    frame.style.width = "1px";
+    frame.style.height = "1px";
+    frame.style.border = "0";
+    frame.style.opacity = "0";
+
+    let cleanedUp = false;
+    const cleanup = () => {
+      if (cleanedUp) return;
+      cleanedUp = true;
+      frame.contentWindow?.removeEventListener("afterprint", cleanup);
+      window.clearTimeout(fallbackCleanup);
+      window.setTimeout(() => frame.remove(), 250);
+    };
+    const fallbackCleanup = window.setTimeout(cleanup, 30000);
+
+    try {
+      document.body.appendChild(frame);
+      const printDocument = frame.contentDocument;
+      const printWindow = frame.contentWindow;
+      if (!printDocument || !printWindow) {
+        throw new Error("The browser could not prepare the KOT print frame.");
+      }
+
+      printWindow.addEventListener("afterprint", cleanup, { once: true });
+      printDocument.open();
+      printDocument.write(buildKotPrintHtml(order, templateConfig));
+      printDocument.close();
+
+      window.setTimeout(() => {
+        try {
+          if (!frame.contentWindow) throw new Error("The KOT print frame is no longer available.");
+          frame.contentWindow.focus();
+          frame.contentWindow.print();
+
+          if (!sample) {
+            autoPrintedKotIdsRef.current.add(order.id);
+            const savedIds = [...autoPrintedKotIdsRef.current].slice(-500);
+            try {
+              window.localStorage.setItem("ukos.kot.autoPrintedIds.v1", JSON.stringify(savedIds));
+              setAutoPrintNotice(`Auto-print sent ${order.kotNumber} to the Windows default printer.`);
+            } catch {
+              setAutoPrintNotice(`Auto-print sent ${order.kotNumber}, but this browser could not persist duplicate-print history. Keep this tab open for the current session.`);
+            }
+          } else {
+            setAutoPrintNotice("Sample KOT sent to the Windows default printer.");
+          }
+          setPrintingOrderId(null);
+          window.setTimeout(cleanup, 10000);
+        } catch (error) {
+          if (!sample) autoPrintingKotIdsRef.current.delete(order.id);
+          setPrintingOrderId(null);
+          setPrintError(error instanceof Error ? error.message : "Unable to send the KOT to the Windows printer.");
+          cleanup();
+        }
+      }, 500);
+    } catch (error) {
+      if (!sample) autoPrintingKotIdsRef.current.delete(order.id);
+      setPrintingOrderId(null);
+      setPrintError(error instanceof Error ? error.message : "Unable to prepare the KOT print job.");
+      cleanup();
+    }
+  };
+
   const updateStatus = async (order: OrderRecord, status: OrderStatus) => {
     const actionLabel = status === "CONFIRMED" ? "accept" : status === "OUT_FOR_DELIVERY" ? "mark handed over" : status === "CANCELLED" ? "cancel" : `move to ${statusLabel(status).toLowerCase()}`;
     if (status === "CANCELLED" && !window.confirm(`Cancel ${order.kotNumber}? This will remain in today's order history.`)) return;
@@ -772,8 +882,12 @@ export default function OrdersPage({
       if (!response.ok) {
         throw new Error(payload && typeof payload.error === "string" ? payload.error : `Unable to ${actionLabel} order.`);
       }
-      setSelectedOrder(payload as OrderRecord);
+      const updatedOrder = payload as OrderRecord;
+      setSelectedOrder(updatedOrder);
       setNotice(`${order.kotNumber} ${status === "CONFIRMED" ? "accepted" : status === "OUT_FOR_DELIVERY" ? "handed over" : status === "CANCELLED" ? "cancelled" : `updated to ${statusLabel(status).toLowerCase()}`}.`);
+      if (status === "CONFIRMED" && autoPrintEnabled) {
+        window.setTimeout(() => printKotAutomatically(updatedOrder), 250);
+      }
       await loadOrders(true);
     } catch (error) {
       setApiError(error instanceof Error ? error.message : "Unable to update this order.");
@@ -830,7 +944,7 @@ export default function OrdersPage({
           <div>
             <p className="kot-eyebrow">UNDERGROUND KITCHEN OS</p>
             <h1>KOT Designer</h1>
-            <p className="kot-muted">Design and print KOTs using the Windows driver. Silent automatic printing remains disabled.</p>
+            <p className="kot-muted">Use the Windows driver for manual or silent printing. Silent mode requires the dedicated Chrome --kiosk-printing shortcut.</p>
           </div>
           <div className="kot-header-actions">
             <button className="kot-button kot-button-secondary" onClick={() => setView("orders")}>Back to orders</button>
@@ -842,6 +956,7 @@ export default function OrdersPage({
         {templateNotice && <div className="kot-alert kot-alert-success" role="status">{templateNotice}</div>}
         {printError && <ApiError>{printError}</ApiError>}
         {printNotice && <div className="kot-alert kot-alert-success" role="status">{printNotice}</div>}
+        {autoPrintNotice && <div className="kot-alert kot-alert-success" role="status">{autoPrintNotice}</div>}
 
         {templateLoading ? (
           <div className="kot-empty"><div className="kot-spinner"/>Loading template settings…</div>
@@ -947,9 +1062,9 @@ export default function OrdersPage({
               </div>
 
               <div className="kot-panel kot-readiness-panel">
-                <div className="kot-panel-heading"><div><h2>Kitchen print settings</h2><p>Manual printing uses the Windows driver; silent printing remains disabled.</p></div></div>
-                <div className="kot-readiness-row"><span>Automatic printing</span><label className="kot-disabled-switch"><input type="checkbox" disabled/><strong>OFF · KOT-03</strong></label></div>
-                <div className="kot-readiness-row"><span>Planned auto-print trigger</span><strong>After staff acceptance</strong></div>
+                <div className="kot-panel-heading"><div><h2>Kitchen print settings</h2><p>Silent printing requires the dedicated Chrome shortcut and DCode as the Windows default.</p></div></div>
+                <div className="kot-readiness-row"><span>Automatic printing</span><strong>{autoPrintEnabled ? "ON · this browser" : "OFF · manual only"}</strong></div>
+                <div className="kot-readiness-row"><span>Auto-print trigger</span><strong>After staff acceptance</strong></div>
                 <div className="kot-readiness-row"><span>Printer</span><strong>DCode DCRP30 · Windows driver</strong></div>
                 <div className="kot-readiness-row"><span>Default paper preview</span><strong>{templateConfig.paperWidth}</strong></div>
                 <div className="kot-readiness-row"><span>Website channel</span><strong className="kot-ready-text">Existing order flow</strong></div>
@@ -957,10 +1072,10 @@ export default function OrdersPage({
                 <div className="kot-readiness-row"><span>Swiggy</span><strong className="kot-pending-text">Integration pending</strong></div>
               </div>
               <div className="kot-note-card">
-                <strong>Manual printing test</strong>
-                <p>Print a sample ticket through the Windows printer driver. This opens the browser print dialog; automatic silent printing remains disabled until the local print bridge is installed and tested.</p>
-                <button type="button" className="kot-button kot-button-primary kot-print-sample" onClick={() => printKot(sampleKotOrder())} disabled={printingOrderId !== null || templateLoading}>
-                  {printingOrderId === "sample-kot" ? "Opening print dialog…" : "Print sample KOT"}
+                <strong>Printer test</strong>
+                <p>{autoPrintEnabled ? "Send a sample ticket through Chrome silent printing. Confirm that it prints without a browser dialog." : "Print a sample ticket through the Windows printer driver. This opens the browser print dialog; enable Auto-print and use the dedicated Chrome kiosk shortcut to test silent printing."}</p>
+                <button type="button" className="kot-button kot-button-primary kot-print-sample" onClick={() => autoPrintEnabled ? printKotAutomatically(sampleKotOrder(), true) : printKot(sampleKotOrder())} disabled={printingOrderId !== null || templateLoading}>
+                  {printingOrderId === "sample-kot" ? "Sending sample…" : autoPrintEnabled ? "Print sample KOT silently" : "Print sample KOT"}
                 </button>
               </div>
             </section>
@@ -998,6 +1113,7 @@ export default function OrdersPage({
       {notice && <div className="kot-alert kot-alert-success" role="status">{notice}</div>}
       {printError && <ApiError>{printError}</ApiError>}
       {printNotice && <div className="kot-alert kot-alert-success" role="status">{printNotice}</div>}
+      {autoPrintNotice && <div className="kot-alert kot-alert-success" role="status">{autoPrintNotice}</div>}
 
       <section className="kot-stat-grid" aria-label="Today's order status counts">
         <div className="kot-stat-card"><span>New</span><strong>{countNew}</strong><small>Awaiting acceptance</small></div>
@@ -1013,9 +1129,9 @@ export default function OrdersPage({
           </div>
           <div className="kot-live-tools">
             <label className="kot-sound-toggle"><input type="checkbox" checked={soundEnabled} onChange={(event) => handleSoundToggle(event.target.checked)}/> Sound alerts</label>
-            <label className="kot-auto-print-toggle" title="Automatic printing becomes available after printer setup in KOT-02 and print-service activation in KOT-03.">
-              <input type="checkbox" checked={false} disabled aria-label="Automatic printing unavailable until printer setup"/>
-              <span>Auto-print</span><small>OFF · manual only</small>
+            <label className="kot-auto-print-toggle" title="Auto-prints orders after staff acceptance. Silent printing requires the dedicated Chrome shortcut with --kiosk-printing and DCode DCRP30 as the Windows default printer.">
+              <input type="checkbox" checked={autoPrintEnabled} onChange={(event) => handleAutoPrintToggle(event.target.checked)} aria-label="Enable automatic KOT printing after acceptance"/>
+              <span>Auto-print</span><small>{autoPrintEnabled ? "ON · after acceptance" : "OFF · manual only"}</small>
             </label>
             <div className="kot-timing-utility" ref={timingPopoverRef}>
               <button
