@@ -3,6 +3,9 @@ import type { OrderChannel, OrderStatus } from "@prisma/client";
 
 type TransactionClient = Prisma.TransactionClient;
 
+export type KotTemplateType = "KITCHEN" | "CUSTOMER";
+export type KotSectionId = "order" | "customer" | "items" | "totals" | "special" | "footer";
+
 export type KotTemplateConfig = {
   paperWidth: "58mm" | "80mm";
   headerText: string;
@@ -13,10 +16,19 @@ export type KotTemplateConfig = {
   showChannel: true;
   showReceivedAt: true;
   showExternalOrderReference: boolean;
+  showInvoiceNumber: boolean;
   showCustomerFirstName: boolean;
+  showCustomerPhone: boolean;
+  showDeliveryAddress: boolean;
   showItems: true;
   showIngredients: boolean;
+  showItemPrices: boolean;
+  showSubtotal: boolean;
+  showDeliveryCharge: boolean;
+  showTotal: boolean;
+  showPaymentMethod: boolean;
   showSpecialInstructions: true;
+  sectionOrder: KotSectionId[];
   fontSize: number;
   headingWeight: "normal" | "bold";
   lineSpacing: "compact" | "normal" | "relaxed";
@@ -24,26 +36,56 @@ export type KotTemplateConfig = {
   alignment: "left" | "center";
 };
 
+const DEFAULT_SECTION_ORDER: KotSectionId[] = ["order", "customer", "items", "totals", "special", "footer"];
+
 export const DEFAULT_KOT_TEMPLATE: KotTemplateConfig = {
   paperWidth: "80mm",
   headerText: "UNDERGROUND KITCHEN",
-  footerText: "Thank you",
+  footerText: "",
   showBrandName: true,
   showLogo: false,
   showKotNumber: true,
   showChannel: true,
   showReceivedAt: true,
   showExternalOrderReference: true,
+  showInvoiceNumber: false,
   showCustomerFirstName: true,
+  showCustomerPhone: false,
+  showDeliveryAddress: false,
   showItems: true,
   showIngredients: true,
+  showItemPrices: false,
+  showSubtotal: false,
+  showDeliveryCharge: false,
+  showTotal: false,
+  showPaymentMethod: false,
   showSpecialInstructions: true,
+  sectionOrder: [...DEFAULT_SECTION_ORDER],
   fontSize: 12,
   headingWeight: "bold",
   lineSpacing: "normal",
   margin: "normal",
   alignment: "left",
 };
+
+export const DEFAULT_CUSTOMER_KOT_TEMPLATE: KotTemplateConfig = {
+  ...DEFAULT_KOT_TEMPLATE,
+  headerText: "UNDERGROUND SALAD BAR",
+  footerText: "Thank you for ordering!",
+  showInvoiceNumber: true,
+  showCustomerPhone: true,
+  showDeliveryAddress: true,
+  showItemPrices: true,
+  showSubtotal: true,
+  showDeliveryCharge: true,
+  showTotal: true,
+  showPaymentMethod: true,
+  sectionOrder: ["order", "customer", "items", "totals", "special", "footer"],
+};
+
+export function getDefaultKotTemplate(type: KotTemplateType): KotTemplateConfig {
+  return type === "CUSTOMER" ? DEFAULT_CUSTOMER_KOT_TEMPLATE : DEFAULT_KOT_TEMPLATE;
+}
 
 export class KotValidationError extends Error {
   constructor(message: string) {
@@ -107,71 +149,100 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-export function validateKotTemplateConfig(value: unknown): KotTemplateConfig {
+export function validateKotTemplateConfig(
+  value: unknown,
+  type: KotTemplateType = "KITCHEN",
+): KotTemplateConfig {
   if (!isRecord(value)) throw new KotValidationError("KOT template settings are invalid.");
 
-  const paperWidth = value.paperWidth;
-  const headerText = value.headerText;
-  const footerText = value.footerText;
-  const fontSize = value.fontSize;
-  const lineSpacing = value.lineSpacing;
-  const margin = value.margin;
-  const headingWeight = value.headingWeight;
-  const alignment = value.alignment;
+  const defaults = getDefaultKotTemplate(type);
+  const paperWidth = value.paperWidth ?? defaults.paperWidth;
+  const headerText = value.headerText ?? defaults.headerText;
+  const footerText = value.footerText ?? defaults.footerText;
+  const fontSize = value.fontSize ?? defaults.fontSize;
+  const lineSpacing = value.lineSpacing ?? defaults.lineSpacing;
+  const margin = value.margin ?? defaults.margin;
+  const headingWeight = value.headingWeight ?? defaults.headingWeight;
+  const alignment = value.alignment ?? defaults.alignment;
 
-  if (paperWidth !== "58mm" && paperWidth !== "80mm") {
-    throw new KotValidationError("Choose a supported paper width.");
-  }
-  if (typeof headerText !== "string" || headerText.trim().length > 80) {
-    throw new KotValidationError("Header text must be 80 characters or fewer.");
-  }
-  if (typeof footerText !== "string" || footerText.length > 160) {
-    throw new KotValidationError("Footer text must be 160 characters or fewer.");
-  }
-  if (!Number.isInteger(fontSize) || Number(fontSize) < 10 || Number(fontSize) > 18) {
-    throw new KotValidationError("Font size must be between 10 and 18.");
-  }
-  if (lineSpacing !== "compact" && lineSpacing !== "normal" && lineSpacing !== "relaxed") {
-    throw new KotValidationError("Choose a valid line spacing.");
-  }
-  if (margin !== "narrow" && margin !== "normal" && margin !== "wide") {
-    throw new KotValidationError("Choose a valid print margin.");
-  }
-  if (headingWeight !== "normal" && headingWeight !== "bold") {
-    throw new KotValidationError("Choose a valid heading weight.");
-  }
-  if (alignment !== "left" && alignment !== "center") {
-    throw new KotValidationError("Choose a valid alignment.");
-  }
+  if (paperWidth !== "58mm" && paperWidth !== "80mm") throw new KotValidationError("Choose a supported paper width.");
+  if (typeof headerText !== "string" || headerText.trim().length > 80) throw new KotValidationError("Header text must be 80 characters or fewer.");
+  if (typeof footerText !== "string" || footerText.length > 160) throw new KotValidationError("Footer text must be 160 characters or fewer.");
+  if (!Number.isInteger(fontSize) || Number(fontSize) < 10 || Number(fontSize) > 18) throw new KotValidationError("Font size must be between 10 and 18.");
+  if (lineSpacing !== "compact" && lineSpacing !== "normal" && lineSpacing !== "relaxed") throw new KotValidationError("Choose a valid line spacing.");
+  if (margin !== "narrow" && margin !== "normal" && margin !== "wide") throw new KotValidationError("Choose a valid print margin.");
+  if (headingWeight !== "normal" && headingWeight !== "bold") throw new KotValidationError("Choose a valid heading weight.");
+  if (alignment !== "left" && alignment !== "center") throw new KotValidationError("Choose a valid alignment.");
 
   const optionalFlags = [
     "showBrandName",
     "showLogo",
     "showExternalOrderReference",
+    "showInvoiceNumber",
     "showCustomerFirstName",
+    "showCustomerPhone",
+    "showDeliveryAddress",
     "showIngredients",
+    "showItemPrices",
+    "showSubtotal",
+    "showDeliveryCharge",
+    "showPaymentMethod",
   ] as const;
+  const flags: Record<(typeof optionalFlags)[number], boolean> = {} as Record<(typeof optionalFlags)[number], boolean>;
   for (const key of optionalFlags) {
-    if (typeof value[key] !== "boolean") {
-      throw new KotValidationError(`KOT setting ${key} must be true or false.`);
-    }
+    const candidate = value[key] ?? defaults[key];
+    if (typeof candidate !== "boolean") throw new KotValidationError(`KOT setting ${key} must be true or false.`);
+    flags[key] = candidate;
   }
 
-  // Critical ticket fields are enforced server-side and cannot be hidden.
+  // Kitchen slips never contain prices, contact information, delivery addresses or payment details.
+  if (type === "KITCHEN") {
+    flags.showCustomerPhone = false;
+    flags.showDeliveryAddress = false;
+    flags.showItemPrices = false;
+    flags.showSubtotal = false;
+    flags.showDeliveryCharge = false;
+    flags.showPaymentMethod = false;
+  }
+
+  const totalFlag = value.showTotal ?? defaults.showTotal;
+  if (typeof totalFlag !== "boolean") throw new KotValidationError("KOT setting showTotal must be true or false.");
+  if (type === "CUSTOMER" && totalFlag !== true) throw new KotValidationError("The customer copy must always show the amount payable.");
+
+  const sectionOrderValue = value.sectionOrder ?? defaults.sectionOrder;
+  const allowedSections: KotSectionId[] = ["order", "customer", "items", "totals", "special", "footer"];
+  if (
+    !Array.isArray(sectionOrderValue) ||
+    sectionOrderValue.length !== allowedSections.length ||
+    sectionOrderValue.some((section) => typeof section !== "string" || !allowedSections.includes(section as KotSectionId)) ||
+    new Set(sectionOrderValue).size !== allowedSections.length
+  ) {
+    throw new KotValidationError("Arrange each KOT section exactly once.");
+  }
+
   return {
     paperWidth,
     headerText: headerText.trim(),
     footerText: footerText.trim(),
-    showBrandName: value.showBrandName as boolean,
-    showLogo: value.showLogo as boolean,
+    showBrandName: flags.showBrandName,
+    showLogo: flags.showLogo,
     showKotNumber: true,
     showChannel: true,
     showReceivedAt: true,
-    showExternalOrderReference: value.showExternalOrderReference as boolean,
-    showCustomerFirstName: value.showCustomerFirstName as boolean,
+    showExternalOrderReference: flags.showExternalOrderReference,
+    showInvoiceNumber: flags.showInvoiceNumber,
+    showCustomerFirstName: flags.showCustomerFirstName,
+    showCustomerPhone: flags.showCustomerPhone,
+    showDeliveryAddress: flags.showDeliveryAddress,
     showItems: true,
-    showIngredients: value.showIngredients as boolean,
+    showIngredients: flags.showIngredients,
+    showItemPrices: flags.showItemPrices,
+    showSubtotal: flags.showSubtotal,
+    showDeliveryCharge: flags.showDeliveryCharge,
+    showTotal: type === "CUSTOMER" ? true : false,
+    showPaymentMethod: flags.showPaymentMethod,
     showSpecialInstructions: true,
+    sectionOrder: sectionOrderValue as KotSectionId[],
     fontSize: Number(fontSize),
     headingWeight,
     lineSpacing,
@@ -180,9 +251,12 @@ export function validateKotTemplateConfig(value: unknown): KotTemplateConfig {
   };
 }
 
-export async function getKotTemplate(prisma: PrismaClient) {
+export async function getKotTemplate(prisma: PrismaClient, type: KotTemplateType = "KITCHEN") {
+  const templateCode = type === "CUSTOMER" ? "CUSTOMER_COPY" : "DEFAULT";
+  const templateName = type === "CUSTOMER" ? "Customer Receipt" : "Kitchen KOT";
+  const defaults = getDefaultKotTemplate(type);
   const template = await prisma.kotTemplate.findUnique({
-    where: { code: "DEFAULT" },
+    where: { code: templateCode },
     include: {
       versions: {
         orderBy: { versionNumber: "desc" },
@@ -193,8 +267,8 @@ export async function getKotTemplate(prisma: PrismaClient) {
 
   if (!template) {
     return {
-      template: { code: "DEFAULT", name: "Default Kitchen KOT" },
-      current: { versionNumber: 0, config: DEFAULT_KOT_TEMPLATE, isActive: true, createdAt: null },
+      template: { code: templateCode, name: templateName },
+      current: { versionNumber: 0, config: defaults, isActive: true, createdAt: null },
       history: [],
     };
   }
@@ -203,8 +277,8 @@ export async function getKotTemplate(prisma: PrismaClient) {
   return {
     template: { code: template.code, name: template.name },
     current: active
-      ? { versionNumber: active.versionNumber, config: active.config, isActive: true, createdAt: active.createdAt }
-      : { versionNumber: 0, config: DEFAULT_KOT_TEMPLATE, isActive: true, createdAt: null },
+      ? { versionNumber: active.versionNumber, config: validateKotTemplateConfig(active.config, type), isActive: true, createdAt: active.createdAt }
+      : { versionNumber: 0, config: defaults, isActive: true, createdAt: null },
     history: template.versions.map((version) => ({
       id: version.id,
       versionNumber: version.versionNumber,
@@ -218,14 +292,17 @@ export async function getKotTemplate(prisma: PrismaClient) {
 export async function saveKotTemplate(
   prisma: PrismaClient,
   input: unknown,
+  type: KotTemplateType = "KITCHEN",
   createdByEmail?: string | null,
 ) {
-  const config = validateKotTemplateConfig(input);
+  const templateCode = type === "CUSTOMER" ? "CUSTOMER_COPY" : "DEFAULT";
+  const templateName = type === "CUSTOMER" ? "Customer Receipt" : "Kitchen KOT";
+  const config = validateKotTemplateConfig(input, type);
 
   return prisma.$transaction(async (tx) => {
     const template = await tx.kotTemplate.upsert({
-      where: { code: "DEFAULT" },
-      create: { code: "DEFAULT", name: "Default Kitchen KOT" },
+      where: { code: templateCode },
+      create: { code: templateCode, name: templateName },
       update: {},
     });
 
