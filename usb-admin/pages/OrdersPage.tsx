@@ -889,7 +889,7 @@ export default function OrdersPage({
     }
   };
 
-  const printKot = (order: OrderRecord) => {
+  const printKot = (order: OrderRecord, type: KotTemplateType) => {
     setPrintError("");
     setPrintNotice("");
     const printWindow = window.open("", "_blank", "popup,width=420,height=720");
@@ -900,7 +900,7 @@ export default function OrdersPage({
     setPrintingOrderId(order.id);
     try {
       printWindow.document.open();
-      printWindow.document.write(buildKotPrintHtml(order, templateConfig));
+      printWindow.document.write(buildKotPrintHtml(order, templateConfigs[type], type));
       printWindow.document.close();
       printWindow.addEventListener("afterprint", () => {
         printWindow.close();
@@ -910,7 +910,7 @@ export default function OrdersPage({
         if (!printWindow.closed) {
           printWindow.focus();
           printWindow.print();
-          setPrintNotice(`Print dialog opened for ${order.kotNumber}. Choose DCode DCRP30 and confirm the paper output.`);
+          setPrintNotice(`${type === "CUSTOMER" ? "Customer receipt" : "Kitchen KOT"} opened for ${order.kotNumber}. Choose POS-80C and confirm the paper output.`);
           window.setTimeout(() => setPrintingOrderId((current) => current === order.id ? null : current), 60000);
         }
       }, 600);
@@ -918,6 +918,38 @@ export default function OrdersPage({
       printWindow.close();
       setPrintingOrderId(null);
       setPrintError(error instanceof Error ? error.message : "Unable to open the KOT print dialog.");
+    }
+  };
+
+  const printBothKotCopies = (order: OrderRecord) => {
+    setPrintError("");
+    setPrintNotice("");
+    const printWindow = window.open("", "_blank", "popup,width=420,height=900");
+    if (!printWindow) {
+      setPrintError("The print window was blocked. Allow pop-ups for the Kitchen OS site, then try again.");
+      return;
+    }
+    setPrintingOrderId(order.id);
+    try {
+      printWindow.document.open();
+      printWindow.document.write(buildBothKotPrintHtml(order, templateConfigs.CUSTOMER, templateConfigs.KITCHEN));
+      printWindow.document.close();
+      printWindow.addEventListener("afterprint", () => {
+        printWindow.close();
+        setPrintingOrderId(null);
+      }, { once: true });
+      window.setTimeout(() => {
+        if (!printWindow.closed) {
+          printWindow.focus();
+          printWindow.print();
+          setPrintNotice(`Customer receipt + kitchen ticket opened for ${order.kotNumber}.`);
+          window.setTimeout(() => setPrintingOrderId((current) => current === order.id ? null : current), 60000);
+        }
+      }, 600);
+    } catch (error) {
+      printWindow.close();
+      setPrintingOrderId(null);
+      setPrintError(error instanceof Error ? error.message : "Unable to open both KOT copies.");
     }
   };
 
@@ -939,9 +971,9 @@ export default function OrdersPage({
     const savedIds = [...autoPrintedKotIdsRef.current].slice(-500);
     try {
       window.localStorage.setItem("ukos.kot.autoPrintedIds.v1", JSON.stringify(savedIds));
-      setAutoPrintNotice(`Auto-print sent ${order.kotNumber} to the Windows default printer.`);
+      setAutoPrintNotice(`Customer receipt and kitchen ticket for ${order.kotNumber} sent to the Windows default printer.`);
     } catch {
-      setAutoPrintNotice(`Auto-print sent ${order.kotNumber}, but this browser could not persist duplicate-print history. Keep this tab open for the current session.`);
+      setAutoPrintNotice(`Both copies for ${order.kotNumber} were sent, but this browser could not persist duplicate-print history. Keep this tab open for the current session.`);
     }
   };
 
@@ -967,7 +999,9 @@ export default function OrdersPage({
     if (reservedWindow) {
       try {
         reservedWindow.document.open();
-        reservedWindow.document.write(buildKotPrintHtml(order, templateConfig));
+        reservedWindow.document.write(sample
+          ? buildKotPrintHtml(order, templateConfigs[activeTemplateType], activeTemplateType)
+          : buildBothKotPrintHtml(order, templateConfigs.CUSTOMER, templateConfigs.KITCHEN));
         reservedWindow.document.close();
         reservedWindow.addEventListener("afterprint", () => {
           if (!reservedWindow.closed) reservedWindow.close();
@@ -1031,7 +1065,9 @@ export default function OrdersPage({
 
       printWindow.addEventListener("afterprint", cleanup, { once: true });
       printDocument.open();
-      printDocument.write(buildKotPrintHtml(order, templateConfig));
+      printDocument.write(sample
+        ? buildKotPrintHtml(order, templateConfigs[activeTemplateType], activeTemplateType)
+        : buildBothKotPrintHtml(order, templateConfigs.CUSTOMER, templateConfigs.KITCHEN));
       printDocument.close();
 
       window.setTimeout(() => {
@@ -1043,7 +1079,7 @@ export default function OrdersPage({
           if (!sample) {
             recordAutoPrintSuccess(order);
           } else {
-            setAutoPrintNotice("Sample KOT sent to the Windows default printer.");
+            setAutoPrintNotice(`Sample ${activeTemplateType === "CUSTOMER" ? "customer receipt" : "kitchen ticket"} sent to the Windows default printer.`);
           }
           setPrintingOrderId(null);
           window.setTimeout(cleanup, 10000);
