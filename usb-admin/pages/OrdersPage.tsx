@@ -40,6 +40,7 @@ type OrderRecord = {
   acceptanceDurationSeconds: number | null;
   preparationDurationSeconds: number | null;
   total: number;
+  deliveryCharge: number | null;
   paymentMethod: string;
   createdAt: string;
   deliveryName: string | null;
@@ -64,6 +65,9 @@ type OrdersResponse = {
   channelCounts: Record<OrderChannel, number>;
 };
 
+type KotTemplateType = "KITCHEN" | "CUSTOMER";
+type KotSectionId = "order" | "customer" | "items" | "totals" | "special" | "footer";
+
 type KotTemplateConfig = {
   paperWidth: "58mm" | "80mm";
   headerText: string;
@@ -74,10 +78,19 @@ type KotTemplateConfig = {
   showChannel: true;
   showReceivedAt: true;
   showExternalOrderReference: boolean;
+  showInvoiceNumber: boolean;
   showCustomerFirstName: boolean;
+  showCustomerPhone: boolean;
+  showDeliveryAddress: boolean;
   showItems: true;
   showIngredients: boolean;
+  showItemPrices: boolean;
+  showSubtotal: boolean;
+  showDeliveryCharge: boolean;
+  showTotal: boolean;
+  showPaymentMethod: boolean;
   showSpecialInstructions: true;
+  sectionOrder: KotSectionId[];
   fontSize: number;
   headingWeight: "normal" | "bold";
   lineSpacing: "compact" | "normal" | "relaxed";
@@ -101,25 +114,63 @@ type KotTemplateResponse = {
   history: Array<{ id: string; versionNumber: number; isActive: boolean; createdAt: string; createdByEmail: string | null }>;
 };
 
-const DEFAULT_TEMPLATE: KotTemplateConfig = {
+const DEFAULT_SECTION_ORDER: KotSectionId[] = ["order", "customer", "items", "totals", "special", "footer"];
+
+const DEFAULT_KITCHEN_TEMPLATE: KotTemplateConfig = {
   paperWidth: "80mm",
   headerText: "UNDERGROUND KITCHEN",
-  footerText: "Thank you",
+  footerText: "",
   showBrandName: true,
   showLogo: false,
   showKotNumber: true,
   showChannel: true,
   showReceivedAt: true,
   showExternalOrderReference: true,
+  showInvoiceNumber: false,
   showCustomerFirstName: true,
+  showCustomerPhone: false,
+  showDeliveryAddress: false,
   showItems: true,
   showIngredients: true,
+  showItemPrices: false,
+  showSubtotal: false,
+  showDeliveryCharge: false,
+  showTotal: false,
+  showPaymentMethod: false,
   showSpecialInstructions: true,
+  sectionOrder: [...DEFAULT_SECTION_ORDER],
   fontSize: 12,
   headingWeight: "bold",
   lineSpacing: "normal",
   margin: "normal",
   alignment: "left",
+};
+
+const DEFAULT_CUSTOMER_TEMPLATE: KotTemplateConfig = {
+  ...DEFAULT_KITCHEN_TEMPLATE,
+  headerText: "UNDERGROUND SALAD BAR",
+  footerText: "Thank you for ordering!",
+  showInvoiceNumber: true,
+  showCustomerPhone: true,
+  showDeliveryAddress: true,
+  showItemPrices: true,
+  showSubtotal: true,
+  showDeliveryCharge: true,
+  showTotal: true,
+  showPaymentMethod: true,
+};
+
+function defaultTemplate(type: KotTemplateType): KotTemplateConfig {
+  return type === "CUSTOMER" ? DEFAULT_CUSTOMER_TEMPLATE : DEFAULT_KITCHEN_TEMPLATE;
+}
+
+const KOT_SECTION_LABELS: Record<KotSectionId, string> = {
+  order: "Order reference",
+  customer: "Customer details",
+  items: "Ordered bowls & ingredients",
+  totals: "Pricing & payment",
+  special: "Special instructions",
+  footer: "Footer message",
 };
 
 const STATUS_OPTIONS: Array<{ value: "ALL" | OrderStatusFilter; label: string }> = [
@@ -146,11 +197,6 @@ function shiftDate(dateKey: string, days: number): string {
   const date = new Date(`${dateKey}T12:00:00.000Z`);
   date.setUTCDate(date.getUTCDate() + days);
   return date.toISOString().slice(0, 10);
-}
-
-function firstName(value: string | null | undefined): string {
-  const trimmed = value?.trim();
-  return trimmed ? trimmed.split(/\s+/)[0] : "Guest";
 }
 
 function customerDetails(order: OrderRecord) {
@@ -366,22 +412,23 @@ function sampleKotOrder(): OrderRecord {
     cancelledAt: null,
     acceptanceDurationSeconds: null,
     preparationDurationSeconds: null,
-    total: 0,
-    paymentMethod: "TEST",
+    total: 570,
+    deliveryCharge: 50,
+    paymentMethod: "COD",
     createdAt: new Date().toISOString(),
     deliveryName: "Sample Customer",
-    deliveryPhone: null,
-    deliveryAddress: null,
-    deliveryArea: null,
-    deliveryCity: null,
+    deliveryPhone: "9876543210",
+    deliveryAddress: "Flat 4B, Green Tower, MG Road",
+    deliveryArea: "Aundh",
+    deliveryCity: "Pune",
     specialInstructions: "Please keep the dressing separate.",
     customer: null,
     bowls: [{
       id: "sample-bowl",
       bowlName: "Continental Bowl",
-      quantity: 1,
-      price: 0,
-      details: ["Rice", "Grilled chicken", "Roasted vegetables", "Pesto dressing"].join("\n"),
+      quantity: 2,
+      price: 520,
+      details: ["BASE: Rice", "PROTEIN: Grilled chicken", "VEGGIES: Roasted vegetables", "DRESSING: Pesto"].join("\n"),
     }],
     statusEvents: [],
   };
@@ -461,12 +508,27 @@ export default function OrdersPage({
   const selectedOrderIdRef = useRef<string | null>(null);
   const loadingRef = useRef(false);
 
-  const [templateData, setTemplateData] = useState<KotTemplateResponse | null>(null);
-  const [templateConfig, setTemplateConfig] = useState<KotTemplateConfig>(DEFAULT_TEMPLATE);
+  const [activeTemplateType, setActiveTemplateType] = useState<KotTemplateType>("KITCHEN");
+  const [templateDataByType, setTemplateDataByType] = useState<Record<KotTemplateType, KotTemplateResponse | null>>({ KITCHEN: null, CUSTOMER: null });
+  const [templateConfigs, setTemplateConfigs] = useState<Record<KotTemplateType, KotTemplateConfig>>({
+    KITCHEN: DEFAULT_KITCHEN_TEMPLATE,
+    CUSTOMER: DEFAULT_CUSTOMER_TEMPLATE,
+  });
+  const [draggedSection, setDraggedSection] = useState<KotSectionId | null>(null);
+  const [dragOverSection, setDragOverSection] = useState<KotSectionId | null>(null);
   const [templateLoading, setTemplateLoading] = useState(false);
   const [templateSaving, setTemplateSaving] = useState(false);
   const [templateError, setTemplateError] = useState("");
   const [templateNotice, setTemplateNotice] = useState("");
+
+  const templateData = templateDataByType[activeTemplateType];
+  const templateConfig = templateConfigs[activeTemplateType];
+  const setTemplateConfig = (updater: KotTemplateConfig | ((current: KotTemplateConfig) => KotTemplateConfig)) => {
+    setTemplateConfigs((current) => ({
+      ...current,
+      [activeTemplateType]: typeof updater === "function" ? updater(current[activeTemplateType]) : updater,
+    }));
+  };
   // Persisted settings drive live timer colours. Draft settings only change after Save.
   const [timingSettings, setTimingSettings] = useState<KotChannelTimingSetting[]>(timingDefault());
   const [timingSettingsDraft, setTimingSettingsDraft] = useState<KotChannelTimingSetting[]>(timingDefault());
@@ -601,20 +663,27 @@ export default function OrdersPage({
     setTemplateLoading(true);
     setTemplateError("");
     try {
-      const response = await fetch(`${API_URL}/kot/templates`, {
-        headers: { Authorization: `Bearer ${accessToken}` },
+      const types: KotTemplateType[] = ["KITCHEN", "CUSTOMER"];
+      const loaded = await Promise.all(types.map(async (type) => {
+        const response = await fetch(`${API_URL}/kot/templates?type=${type}`, {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+        const payload = await response.json().catch(() => null);
+        if (response.status === 401) {
+          await onSignOut();
+          throw new Error("Your session expired. Please sign in again.");
+        }
+        if (!response.ok) {
+          throw new Error(payload && typeof payload.error === "string" ? payload.error : `${type.toLowerCase()} template request failed (${response.status}).`);
+        }
+        return [type, payload as KotTemplateResponse] as const;
+      }));
+      const dataByType = Object.fromEntries(loaded) as Record<KotTemplateType, KotTemplateResponse>;
+      setTemplateDataByType(dataByType);
+      setTemplateConfigs({
+        KITCHEN: dataByType.KITCHEN.current.config ?? DEFAULT_KITCHEN_TEMPLATE,
+        CUSTOMER: dataByType.CUSTOMER.current.config ?? DEFAULT_CUSTOMER_TEMPLATE,
       });
-      const payload = await response.json().catch(() => null);
-      if (response.status === 401) {
-        await onSignOut();
-        throw new Error("Your session expired. Please sign in again.");
-      }
-      if (!response.ok) {
-        throw new Error(payload && typeof payload.error === "string" ? payload.error : `Template request failed (${response.status}).`);
-      }
-      const data = payload as KotTemplateResponse;
-      setTemplateData(data);
-      setTemplateConfig(data.current.config ?? DEFAULT_TEMPLATE);
     } catch (error) {
       setTemplateError(error instanceof Error ? error.message : "Unable to load KOT designer.");
     } finally {
@@ -626,6 +695,28 @@ export default function OrdersPage({
     void loadTemplate();
   }, [loadTemplate]);
 
+  const moveTemplateSection = (section: KotSectionId, destinationIndex: number) => {
+    setTemplateConfig((current) => {
+      const next = [...current.sectionOrder];
+      const sourceIndex = next.indexOf(section);
+      if (sourceIndex < 0 || destinationIndex < 0 || destinationIndex >= next.length) return current;
+      next.splice(sourceIndex, 1);
+      next.splice(destinationIndex, 0, section);
+      return { ...current, sectionOrder: next };
+    });
+  };
+
+  const dropTemplateSection = (target: KotSectionId) => {
+    if (draggedSection && draggedSection !== target) {
+      const currentOrder = templateConfig.sectionOrder;
+      const sourceIndex = currentOrder.indexOf(draggedSection);
+      const targetIndex = currentOrder.indexOf(target);
+      const destinationIndex = sourceIndex < targetIndex ? targetIndex - 1 : targetIndex;
+      moveTemplateSection(draggedSection, destinationIndex);
+    }
+    setDraggedSection(null);
+    setDragOverSection(null);
+  };
   const loadTimingSettings = useCallback(async () => {
     setTimingSettingsLoading(true);
     setTimingSettingsError("");
@@ -735,7 +826,7 @@ export default function OrdersPage({
     }
   };
 
-  const printKot = (order: OrderRecord) => {
+  const printKot = (order: OrderRecord, type: KotTemplateType) => {
     setPrintError("");
     setPrintNotice("");
     const printWindow = window.open("", "_blank", "popup,width=420,height=720");
@@ -746,7 +837,7 @@ export default function OrdersPage({
     setPrintingOrderId(order.id);
     try {
       printWindow.document.open();
-      printWindow.document.write(buildKotPrintHtml(order, templateConfig));
+      printWindow.document.write(buildKotPrintHtml(order, templateConfigs[type], type));
       printWindow.document.close();
       printWindow.addEventListener("afterprint", () => {
         printWindow.close();
@@ -756,7 +847,7 @@ export default function OrdersPage({
         if (!printWindow.closed) {
           printWindow.focus();
           printWindow.print();
-          setPrintNotice(`Print dialog opened for ${order.kotNumber}. Choose DCode DCRP30 and confirm the paper output.`);
+          setPrintNotice(`${type === "CUSTOMER" ? "Customer receipt" : "Kitchen KOT"} opened for ${order.kotNumber}. Choose POS-80C and confirm the paper output.`);
           window.setTimeout(() => setPrintingOrderId((current) => current === order.id ? null : current), 60000);
         }
       }, 600);
@@ -767,10 +858,42 @@ export default function OrdersPage({
     }
   };
 
+  const printBothKotCopies = (order: OrderRecord) => {
+    setPrintError("");
+    setPrintNotice("");
+    const printWindow = window.open("", "_blank", "popup,width=420,height=900");
+    if (!printWindow) {
+      setPrintError("The print window was blocked. Allow pop-ups for the Kitchen OS site, then try again.");
+      return;
+    }
+    setPrintingOrderId(order.id);
+    try {
+      printWindow.document.open();
+      printWindow.document.write(buildBothKotPrintHtml(order, templateConfigs.CUSTOMER, templateConfigs.KITCHEN));
+      printWindow.document.close();
+      printWindow.addEventListener("afterprint", () => {
+        printWindow.close();
+        setPrintingOrderId(null);
+      }, { once: true });
+      window.setTimeout(() => {
+        if (!printWindow.closed) {
+          printWindow.focus();
+          printWindow.print();
+          setPrintNotice(`Customer receipt + kitchen ticket opened for ${order.kotNumber}.`);
+          window.setTimeout(() => setPrintingOrderId((current) => current === order.id ? null : current), 60000);
+        }
+      }, 600);
+    } catch (error) {
+      printWindow.close();
+      setPrintingOrderId(null);
+      setPrintError(error instanceof Error ? error.message : "Unable to open both KOT copies.");
+    }
+  };
+
   const handleAutoPrintToggle = (enabled: boolean) => {
     setAutoPrintEnabled(enabled);
     setAutoPrintNotice(enabled
-      ? "Auto-print enabled on this browser. Use the dedicated Chrome --kiosk-printing shortcut and set DCode DCRP30 as the Windows default printer."
+      ? "Auto-print enabled on this browser. Use the dedicated Chrome --kiosk-printing shortcut and set POS-80C as the Windows default printer."
       : "Auto-print disabled. Orders will require manual printing.");
     try {
       window.localStorage.setItem("ukos.kot.autoPrintEnabled.v1", String(enabled));
@@ -821,7 +944,9 @@ export default function OrdersPage({
 
       printWindow.addEventListener("afterprint", cleanup, { once: true });
       printDocument.open();
-      printDocument.write(buildKotPrintHtml(order, templateConfig));
+      printDocument.write(sample
+        ? buildKotPrintHtml(order, templateConfigs[activeTemplateType], activeTemplateType)
+        : buildBothKotPrintHtml(order, templateConfigs.CUSTOMER, templateConfigs.KITCHEN));
       printDocument.close();
 
       window.setTimeout(() => {
@@ -835,12 +960,12 @@ export default function OrdersPage({
             const savedIds = [...autoPrintedKotIdsRef.current].slice(-500);
             try {
               window.localStorage.setItem("ukos.kot.autoPrintedIds.v1", JSON.stringify(savedIds));
-              setAutoPrintNotice(`Auto-print sent ${order.kotNumber} to the Windows default printer.`);
+              setAutoPrintNotice(`Customer receipt and kitchen ticket for ${order.kotNumber} sent to the Windows default printer.`);
             } catch {
-              setAutoPrintNotice(`Auto-print sent ${order.kotNumber}, but this browser could not persist duplicate-print history. Keep this tab open for the current session.`);
+              setAutoPrintNotice(`Both copies for ${order.kotNumber} were sent, but this browser could not persist duplicate-print history. Keep this tab open for the current session.`);
             }
           } else {
-            setAutoPrintNotice("Sample KOT sent to the Windows default printer.");
+            setAutoPrintNotice(`Sample ${activeTemplateType === "CUSTOMER" ? "customer receipt" : "kitchen ticket"} sent to the Windows default printer.`);
           }
           setPrintingOrderId(null);
           window.setTimeout(cleanup, 10000);
@@ -908,7 +1033,7 @@ export default function OrdersPage({
           "Content-Type": "application/json",
           Authorization: `Bearer ${accessToken}`,
         },
-        body: JSON.stringify({ config: templateConfig }),
+        body: JSON.stringify({ type: activeTemplateType, config: templateConfig }),
       });
       const payload = await response.json().catch(() => null);
       if (response.status === 401) {
@@ -918,7 +1043,7 @@ export default function OrdersPage({
       if (!response.ok) {
         throw new Error(payload && typeof payload.error === "string" ? payload.error : `Template save failed (${response.status}).`);
       }
-      setTemplateNotice(`KOT template v${payload.versionNumber} saved. Existing orders and historical template versions are unchanged.`);
+      setTemplateNotice(`${activeTemplateType === "CUSTOMER" ? "Customer receipt" : "Kitchen KOT"} template v${payload.versionNumber} saved. The other copy is unchanged.`);
       await loadTemplate();
     } catch (error) {
       setTemplateError(error instanceof Error ? error.message : "Unable to save KOT template.");
@@ -928,8 +1053,8 @@ export default function OrdersPage({
   };
 
   const resetTemplate = () => {
-    setTemplateConfig(DEFAULT_TEMPLATE);
-    setTemplateNotice("Default settings loaded in the preview. Save to create a new template version.");
+    setTemplateConfig(defaultTemplate(activeTemplateType));
+    setTemplateNotice(`Default ${activeTemplateType === "CUSTOMER" ? "customer receipt" : "kitchen KOT"} design loaded in the preview. Save to create a new version.`);
     setTemplateError("");
   };
 
@@ -944,7 +1069,7 @@ export default function OrdersPage({
           <div>
             <p className="kot-eyebrow">UNDERGROUND KITCHEN OS</p>
             <h1>KOT Designer</h1>
-            <p className="kot-muted">Design and print KOTs using the Windows driver. Silent automatic printing remains disabled.</p>
+            <p className="kot-muted">Design the customer receipt and kitchen ticket separately. Each copy has its own paper preview, content and section order.</p>
           </div>
           <div className="kot-header-actions">
             <button className="kot-button kot-button-secondary" onClick={() => setView("orders")}>Back to orders</button>
@@ -956,7 +1081,7 @@ export default function OrdersPage({
         {templateNotice && <div className="kot-alert kot-alert-success" role="status">{templateNotice}</div>}
         {printError && <ApiError>{printError}</ApiError>}
         {printNotice && <div className="kot-alert kot-alert-success" role="status">{printNotice}</div>}
-      {autoPrintNotice && <div className="kot-alert kot-alert-success" role="status">{autoPrintNotice}</div>}
+        {autoPrintNotice && <div className="kot-alert kot-alert-success" role="status">{autoPrintNotice}</div>}
 
         {templateLoading ? (
           <div className="kot-empty"><div className="kot-spinner"/>Loading template settings…</div>
@@ -964,8 +1089,17 @@ export default function OrdersPage({
           <form className="kot-designer-layout" onSubmit={saveTemplate}>
             <section className="kot-panel kot-designer-controls">
               <div className="kot-panel-heading">
-                <div><h2>Template settings</h2><p>Changes appear in the preview before you save.</p></div>
-                <span className="kot-version-pill">Current v{templateData?.current.versionNumber ?? 0}</span>
+                <div><h2>{activeTemplateType === "CUSTOMER" ? "Customer receipt" : "Kitchen ticket"}</h2><p>{activeTemplateType === "CUSTOMER" ? "Detailed copy with customer details, item prices and amount payable." : "Clean preparation copy: order, customer name, ingredients and instructions. No prices or customer contact details."}</p></div>
+                <span className="kot-version-pill">v{templateData?.current.versionNumber ?? 0}</span>
+              </div>
+
+              <div className="kot-template-tabs" role="tablist" aria-label="Choose ticket design">
+                <button type="button" role="tab" aria-selected={activeTemplateType === "CUSTOMER"} className={activeTemplateType === "CUSTOMER" ? "is-active" : ""} onClick={() => { setActiveTemplateType("CUSTOMER"); setTemplateError(""); setTemplateNotice(""); }}>
+                  <strong>Customer copy</strong><small>Detailed · pricing</small>
+                </button>
+                <button type="button" role="tab" aria-selected={activeTemplateType === "KITCHEN"} className={activeTemplateType === "KITCHEN" ? "is-active" : ""} onClick={() => { setActiveTemplateType("KITCHEN"); setTemplateError(""); setTemplateNotice(""); }}>
+                  <strong>Kitchen copy</strong><small>Preparation · no prices</small>
+                </button>
               </div>
 
               <label className="kot-field-label">Paper width</label>
@@ -979,7 +1113,6 @@ export default function OrdersPage({
 
               <label className="kot-field-label" htmlFor="kot-header">Header text</label>
               <input id="kot-header" className="kot-input" maxLength={80} value={templateConfig.headerText} onChange={(event) => setTemplateConfig((value) => ({ ...value, headerText: event.target.value }))}/>
-
               <label className="kot-field-label" htmlFor="kot-footer">Footer text</label>
               <input id="kot-footer" className="kot-input" maxLength={160} value={templateConfig.footerText} onChange={(event) => setTemplateConfig((value) => ({ ...value, footerText: event.target.value }))}/>
 
@@ -1004,44 +1137,114 @@ export default function OrdersPage({
                 </select>
               </div>
 
-              <h3 className="kot-subheading">Content visibility</h3>
+              <h3 className="kot-subheading">Arrange ticket sections</h3>
+              <p className="kot-helper">Drag sections into the order you prefer. The arrows also work with touch screens and keyboards.</p>
+              <div className="kot-section-organizer">
+                {templateConfig.sectionOrder.map((section, index) => (
+                  <div
+                    key={section}
+                    draggable
+                    onDragStart={(event) => { event.dataTransfer.effectAllowed = "move"; setDraggedSection(section); }}
+                    onDragOver={(event) => { event.preventDefault(); setDragOverSection(section); }}
+                    onDragLeave={() => setDragOverSection((current) => current === section ? null : current)}
+                    onDrop={(event) => { event.preventDefault(); dropTemplateSection(section); }}
+                    onDragEnd={() => { setDraggedSection(null); setDragOverSection(null); }}
+                    className={`kot-section-row ${draggedSection === section ? "is-dragging" : ""} ${dragOverSection === section ? "is-drop-target" : ""}`}
+                  >
+                    <span className="kot-section-grip" aria-hidden="true">⠿</span>
+                    <span className="kot-section-index">{index + 1}</span>
+                    <strong>{KOT_SECTION_LABELS[section]}</strong>
+                    <span className="kot-section-actions">
+                      <button type="button" className="kot-icon-button" aria-label={`Move ${KOT_SECTION_LABELS[section]} up`} title="Move up" disabled={index === 0} onClick={() => moveTemplateSection(section, index - 1)}>↑</button>
+                      <button type="button" className="kot-icon-button" aria-label={`Move ${KOT_SECTION_LABELS[section]} down`} title="Move down" disabled={index === templateConfig.sectionOrder.length - 1} onClick={() => moveTemplateSection(section, index + 1)}>↓</button>
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              <h3 className="kot-subheading">Content options</h3>
               <div className="kot-toggle-list">
                 <label><span>Brand name</span><input type="checkbox" checked={templateConfig.showBrandName} onChange={(event) => setTemplateConfig((value) => ({ ...value, showBrandName: event.target.checked }))}/></label>
                 <label><span>External order reference</span><input type="checkbox" checked={templateConfig.showExternalOrderReference} onChange={(event) => setTemplateConfig((value) => ({ ...value, showExternalOrderReference: event.target.checked }))}/></label>
-                <label><span>Customer first name only</span><input type="checkbox" checked={templateConfig.showCustomerFirstName} onChange={(event) => setTemplateConfig((value) => ({ ...value, showCustomerFirstName: event.target.checked }))}/></label>
+                {activeTemplateType === "CUSTOMER" && <label><span>Invoice number</span><input type="checkbox" checked={templateConfig.showInvoiceNumber} onChange={(event) => setTemplateConfig((value) => ({ ...value, showInvoiceNumber: event.target.checked }))}/></label>}
+                <label><span>Full customer name</span><input type="checkbox" checked={templateConfig.showCustomerFirstName} onChange={(event) => setTemplateConfig((value) => ({ ...value, showCustomerFirstName: event.target.checked }))}/></label>
                 <label><span>Ingredient details</span><input type="checkbox" checked={templateConfig.showIngredients} onChange={(event) => setTemplateConfig((value) => ({ ...value, showIngredients: event.target.checked }))}/></label>
-                <label className="is-locked"><span>KOT number <small>Required</small></span><input type="checkbox" checked disabled/></label>
-                <label className="is-locked"><span>Order source <small>Required</small></span><input type="checkbox" checked disabled/></label>
-                <label className="is-locked"><span>Received time <small>Required</small></span><input type="checkbox" checked disabled/></label>
-                <label className="is-locked"><span>Items and quantities <small>Required</small></span><input type="checkbox" checked disabled/></label>
-                <label className="is-locked"><span>Special instructions <small>Required</small></span><input type="checkbox" checked disabled/></label>
+                {activeTemplateType === "CUSTOMER" && <>
+                  <label><span>Customer phone</span><input type="checkbox" checked={templateConfig.showCustomerPhone} onChange={(event) => setTemplateConfig((value) => ({ ...value, showCustomerPhone: event.target.checked }))}/></label>
+                  <label><span>Delivery address</span><input type="checkbox" checked={templateConfig.showDeliveryAddress} onChange={(event) => setTemplateConfig((value) => ({ ...value, showDeliveryAddress: event.target.checked }))}/></label>
+                  <label><span>Price beside each bowl</span><input type="checkbox" checked={templateConfig.showItemPrices} onChange={(event) => setTemplateConfig((value) => ({ ...value, showItemPrices: event.target.checked }))}/></label>
+                  <label><span>Items subtotal</span><input type="checkbox" checked={templateConfig.showSubtotal} onChange={(event) => setTemplateConfig((value) => ({ ...value, showSubtotal: event.target.checked }))}/></label>
+                  <label><span>Delivery charge</span><input type="checkbox" checked={templateConfig.showDeliveryCharge} onChange={(event) => setTemplateConfig((value) => ({ ...value, showDeliveryCharge: event.target.checked }))}/></label>
+                  <label className="is-locked"><span>Amount payable <small>Required</small></span><input type="checkbox" checked disabled/></label>
+                  <label><span>Payment method</span><input type="checkbox" checked={templateConfig.showPaymentMethod} onChange={(event) => setTemplateConfig((value) => ({ ...value, showPaymentMethod: event.target.checked }))}/></label>
+                </>}
               </div>
-              <p className="kot-helper">Customer phone numbers, addresses and payment details are never included on KOT tickets. A logo upload is not included yet because the Admin project does not currently contain an approved Underground logo asset.</p>
+              {activeTemplateType === "KITCHEN"
+                ? <p className="kot-helper">Kitchen copy is protected from displaying prices, phone numbers, delivery address or payment details.</p>
+                : <p className="kot-helper">Customer copy uses server-calculated item prices, delivery charge and total. Customer phone and address can be toggled for the copy packed with the order.</p>}
 
               <div className="kot-form-actions">
                 <button type="button" className="kot-button kot-button-secondary" onClick={resetTemplate}>Restore default</button>
-                <button type="submit" className="kot-button kot-button-primary" disabled={templateSaving}>{templateSaving ? "Saving…" : "Save new version"}</button>
+                <button type="submit" className="kot-button kot-button-primary" disabled={templateSaving}>{templateSaving ? "Saving…" : "Save this design"}</button>
               </div>
             </section>
 
             <section className="kot-preview-column">
               <div className="kot-panel">
-                <div className="kot-panel-heading"><div><h2>Live preview</h2><p>Sample data only — no real order is changed.</p></div><span className="kot-preview-tag">PREVIEW</span></div>
+                <div className="kot-panel-heading">
+                  <div><h2>Live {activeTemplateType === "CUSTOMER" ? "customer receipt" : "kitchen ticket"} preview</h2><p>Sample data only — no real order is changed.</p></div>
+                  <span className="kot-preview-tag">{activeTemplateType} · PREVIEW</span>
+                </div>
+                {activeTemplateType === "CUSTOMER" && <p className="kot-preview-hint">This is the detailed slip to accompany the order. Prices are sourced from the server-calculated order.</p>}
+                {activeTemplateType === "KITCHEN" && <p className="kot-preview-hint">This is the kitchen preparation slip. No price, phone number or delivery address is printed.</p>}
                 <div className="kot-paper-stage">
                   <article className={`kot-paper kot-paper-${templateConfig.paperWidth === "80mm" ? "80" : "58"} kot-paper-margin-${templateConfig.margin} kot-paper-heading-${templateConfig.headingWeight}`} style={{ fontSize: `${templateConfig.fontSize}px`, lineHeight: templateConfig.lineSpacing === "compact" ? 1.2 : templateConfig.lineSpacing === "relaxed" ? 1.65 : 1.4, textAlign: templateConfig.alignment }}>
-                    {templateConfig.showBrandName && <div className="kot-paper-brand">{templateConfig.headerText || "UNDERGROUND KITCHEN"}</div>}
-                    {templateConfig.showKotNumber && <div className="kot-paper-number">KOT-20261111-001</div>}
-                    {templateConfig.showChannel && <div className="kot-paper-meta">WEBSITE · 09:42 AM</div>}
-                    {templateConfig.showExternalOrderReference && <div className="kot-paper-meta">ORDER #128</div>}
-                    {templateConfig.showCustomerFirstName && <div className="kot-paper-meta">CUSTOMER: HARSHAL</div>}
-                    <div className="kot-paper-rule"/>
-                    {templateConfig.showItems && <>
-                      <div className="kot-paper-item-title">2 × MEXICAN CHICKEN BOWL</div>
-                      {templateConfig.showIngredients && <div className="kot-paper-details">BASE: Rice<br/>PROTEIN: Chicken<br/>VEGGIES: Lettuce, Corn, Onion<br/>DRESSING: Chipotle</div>}
-                    </>}
-                    <div className="kot-paper-rule"/>
-                    <div className="kot-paper-special">SPECIAL INSTRUCTIONS<br/>Extra dressing on the side.</div>
-                    {templateConfig.footerText && <div className="kot-paper-footer">{templateConfig.footerText}</div>}
+                    {templateConfig.sectionOrder.map((section) => {
+                      const sample = sampleKotOrder();
+                      const sampleCustomer = customerDetails(sample);
+                      const sampleSubtotal = sample.bowls.reduce((sum, bowl) => sum + bowl.price, 0);
+                      switch (section) {
+                        case "order":
+                          return <div className="kot-paper-section" key={section}>
+                            {templateConfig.showBrandName && <div className="kot-paper-brand">{templateConfig.headerText || "UNDERGROUND KITCHEN"}</div>}
+                            <div className="kot-paper-copy-kind">{activeTemplateType === "CUSTOMER" ? "CUSTOMER COPY" : "KITCHEN COPY"}</div>
+                            <div className="kot-paper-number">{sample.kotNumber}</div>
+                            <div className="kot-paper-meta">WEBSITE · {timeLabel(sample.createdAt)}</div>
+                            {templateConfig.showExternalOrderReference && <div className="kot-paper-meta">External ref: —</div>}
+                            {activeTemplateType === "CUSTOMER" && templateConfig.showInvoiceNumber && <div className="kot-paper-meta">Invoice: {sample.invoiceNumber}</div>}
+                          </div>;
+                        case "customer":
+                          return <div className="kot-paper-section" key={section}>
+                            {templateConfig.showCustomerFirstName && <div className="kot-paper-customer-name">Customer: {sampleCustomer.name}</div>}
+                            {activeTemplateType === "CUSTOMER" && templateConfig.showCustomerPhone && <div className="kot-paper-meta">Phone: {sampleCustomer.phone}</div>}
+                            {activeTemplateType === "CUSTOMER" && templateConfig.showDeliveryAddress && <div className="kot-paper-meta">Delivery: {sampleCustomer.address}, {sampleCustomer.area}, {sampleCustomer.city}</div>}
+                          </div>;
+                        case "items":
+                          return <div className="kot-paper-section" key={section}>
+                            {sample.bowls.map((bowl) => <div className="kot-paper-item" key={bowl.id}>
+                              <div className="kot-paper-item-row"><strong>{bowl.quantity} × {bowl.bowlName}</strong>{activeTemplateType === "CUSTOMER" && templateConfig.showItemPrices && <strong>₹{bowl.price.toFixed(2)}</strong>}</div>
+                              {templateConfig.showIngredients && bowl.details && <div className="kot-paper-details">{bowl.details.split("\n").map((line) => <div key={line}>{line}</div>)}</div>}
+                            </div>)}
+                          </div>;
+                        case "totals":
+                          return activeTemplateType === "CUSTOMER" ? <div className="kot-paper-section" key={section}>
+                            {templateConfig.showSubtotal && <div className="kot-paper-total-row"><span>Items subtotal</span><strong>₹{sampleSubtotal.toFixed(2)}</strong></div>}
+                            {templateConfig.showDeliveryCharge && <div className="kot-paper-total-row"><span>Delivery</span><strong>₹{sample.deliveryCharge?.toFixed(2)}</strong></div>}
+                            {templateConfig.showTotal && <div className="kot-paper-grand-total"><span>AMOUNT PAYABLE</span><strong>₹{sample.total.toFixed(2)}</strong></div>}
+                            {templateConfig.showPaymentMethod && <div className="kot-paper-meta">Payment: {sample.paymentMethod}</div>}
+                          </div> : <div key={section}/>;
+                        case "special":
+                          return <div className="kot-paper-section" key={section}><div className="kot-paper-special"><strong>Special instructions</strong><div>{sample.specialInstructions}</div></div></div>;
+                        case "footer":
+                          return <div className="kot-paper-section" key={section}>{templateConfig.footerText && <div className="kot-paper-footer">{templateConfig.footerText}</div>}</div>;
+                        default:
+                          return <div key={section}/>;
+                      }
+                    }).reduce<ReactNode[]>((nodes, node, index) => {
+                      if (index > 0) nodes.push(<div className="kot-paper-section-divider" key={`divider-${index}`}/>);
+                      nodes.push(node);
+                      return nodes;
+                    }, [])}
                   </article>
                 </div>
               </div>
@@ -1062,10 +1265,10 @@ export default function OrdersPage({
               </div>
 
               <div className="kot-panel kot-readiness-panel">
-                <div className="kot-panel-heading"><div><h2>Kitchen print settings</h2><p>Silent printing requires the dedicated Chrome shortcut and DCode as the Windows default.</p></div></div>
+                <div className="kot-panel-heading"><div><h2>Kitchen print settings</h2><p>Silent printing requires the dedicated Chrome shortcut and POS-80C as the Windows default.</p></div></div>
                 <div className="kot-readiness-row"><span>Automatic printing</span><strong>{autoPrintEnabled ? "ON · this browser" : "OFF · manual only"}</strong></div>
                 <div className="kot-readiness-row"><span>Auto-print trigger</span><strong>After staff acceptance</strong></div>
-                <div className="kot-readiness-row"><span>Printer</span><strong>DCode DCRP30 · Windows driver</strong></div>
+                <div className="kot-readiness-row"><span>Printer</span><strong>POS-80C · Windows driver</strong></div>
                 <div className="kot-readiness-row"><span>Default paper preview</span><strong>{templateConfig.paperWidth}</strong></div>
                 <div className="kot-readiness-row"><span>Website channel</span><strong className="kot-ready-text">Existing order flow</strong></div>
                 <div className="kot-readiness-row"><span>Zomato</span><strong className="kot-pending-text">Integration pending</strong></div>
@@ -1074,8 +1277,8 @@ export default function OrdersPage({
               <div className="kot-note-card">
                 <strong>Printer test</strong>
                 <p>{autoPrintEnabled ? "Send a sample ticket through Chrome silent printing. Confirm that it prints without a browser dialog." : "Print a sample ticket through the Windows printer driver. This opens the browser print dialog; enable Auto-print and use the dedicated Chrome kiosk shortcut to test silent printing."}</p>
-                <button type="button" className="kot-button kot-button-primary kot-print-sample" onClick={() => autoPrintEnabled ? printKotAutomatically(sampleKotOrder(), true) : printKot(sampleKotOrder())} disabled={printingOrderId !== null || templateLoading}>
-                  {printingOrderId === "sample-kot" ? "Sending sample…" : autoPrintEnabled ? "Print sample KOT silently" : "Print sample KOT"}
+                <button type="button" className="kot-button kot-button-primary kot-print-sample" onClick={() => autoPrintEnabled ? printKotAutomatically(sampleKotOrder(), true) : printKot(sampleKotOrder(), activeTemplateType)} disabled={printingOrderId !== null || templateLoading}>
+                  {printingOrderId === "sample-kot" ? "Sending sample…" : autoPrintEnabled ? "Print this copy silently" : "Print this copy"}
                 </button>
               </div>
             </section>
@@ -1129,7 +1332,7 @@ export default function OrdersPage({
           </div>
           <div className="kot-live-tools">
             <label className="kot-sound-toggle"><input type="checkbox" checked={soundEnabled} onChange={(event) => handleSoundToggle(event.target.checked)}/> Sound alerts</label>
-            <label className="kot-auto-print-toggle" title="Auto-prints orders after staff acceptance. Silent printing requires the dedicated Chrome shortcut with --kiosk-printing and DCode DCRP30 as the Windows default printer.">
+            <label className="kot-auto-print-toggle" title="Auto-prints orders after staff acceptance. Silent printing requires the dedicated Chrome shortcut with --kiosk-printing and POS-80C as the Windows default printer.">
               <input type="checkbox" checked={autoPrintEnabled} onChange={(event) => handleAutoPrintToggle(event.target.checked)} aria-label="Enable automatic KOT printing after acceptance"/>
               <span>Auto-print</span><small>{autoPrintEnabled ? "ON · after acceptance" : "OFF · manual only"}</small>
             </label>
@@ -1257,7 +1460,7 @@ export default function OrdersPage({
                     <span className={`kot-channel kot-channel-${order.channel.toLowerCase()}`}>{channelLabel(order.channel)}</span>
                     {order.status === "PENDING" && <span className="kot-new-dot">NEW</span>}
                   </div>
-                  <div className="kot-order-customer">{firstName(customer.name)} <span>· {timeLabel(order.createdAt)}</span></div>
+                  <div className="kot-order-customer">{customer.name.trim() || "Guest"} <span>· {timeLabel(order.createdAt)}</span></div>
                   <div className="kot-order-items">{order.bowls.map((bowl) => `${bowl.quantity} × ${bowl.bowlName}`).join(" · ") || "Order items pending"}</div>
                 </div>
                 <div className="kot-order-meta">
@@ -1278,7 +1481,7 @@ export default function OrdersPage({
                       {order.status === "PENDING" && <button className="kot-button kot-button-primary kot-card-action" disabled={busyOrder} onClick={() => void updateStatus(order, "CONFIRMED")}>Accept</button>}
                       {(order.status === "CONFIRMED" || order.status === "PREPARING") && <button className="kot-button kot-button-primary kot-card-action" disabled={busyOrder} onClick={() => void updateStatus(order, "READY")}>Mark ready</button>}
                       {order.status === "READY" && <button className="kot-button kot-button-secondary kot-card-action" disabled={busyOrder} onClick={() => void updateStatus(order, "OUT_FOR_DELIVERY")}>Handed over</button>}
-                      <button type="button" className="kot-button kot-button-secondary kot-card-action kot-print-action" disabled={printingOrderId !== null || templateLoading} onClick={() => printKot(order)}>{printingOrderId === order.id ? "Printing…" : "Print KOT"}</button>
+                      <button type="button" className="kot-button kot-button-secondary kot-card-action kot-print-action" disabled={printingOrderId !== null || templateLoading} onClick={() => printBothKotCopies(order)}>{printingOrderId === order.id ? "Printing…" : "Print both"}</button>
                       {order.status === "CANCELLED" && <span className="kot-card-terminal">Cancelled</span>}
                       {(order.status === "OUT_FOR_DELIVERY" || order.status === "DELIVERED") && <span className="kot-card-terminal">Handed over</span>}
                     </div>
@@ -1350,7 +1553,9 @@ export default function OrdersPage({
                 )}
               </div>
               <div className="kot-order-actions">
-                <button type="button" className="kot-button kot-button-secondary" disabled={printingOrderId !== null || templateLoading} onClick={() => printKot(selectedOrder)}>{printingOrderId === selectedOrder.id ? "Printing…" : "Print KOT"}</button>
+                <button type="button" className="kot-button kot-button-primary" disabled={printingOrderId !== null || templateLoading} onClick={() => printBothKotCopies(selectedOrder)}>{printingOrderId === selectedOrder.id ? "Printing…" : "Print both copies"}</button>
+                <button type="button" className="kot-button kot-button-secondary" disabled={printingOrderId !== null || templateLoading} onClick={() => printKot(selectedOrder, "CUSTOMER")}>Customer receipt</button>
+                <button type="button" className="kot-button kot-button-secondary" disabled={printingOrderId !== null || templateLoading} onClick={() => printKot(selectedOrder, "KITCHEN")}>Kitchen ticket</button>
                 {selectedOrder.status === "PENDING" && <button className="kot-button kot-button-primary" disabled={busyOrder} onClick={() => void updateStatus(selectedOrder, "CONFIRMED")}>Accept order</button>}
                 {(selectedOrder.status === "CONFIRMED" || selectedOrder.status === "PREPARING") && <button className="kot-button kot-button-primary" disabled={busyOrder} onClick={() => void updateStatus(selectedOrder, "READY")}>Mark ready</button>}
                 {selectedOrder.status === "READY" && <button className="kot-button kot-button-primary" disabled={busyOrder} onClick={() => void updateStatus(selectedOrder, "OUT_FOR_DELIVERY")}>Handed over</button>}
@@ -1359,7 +1564,7 @@ export default function OrdersPage({
                 {selectedOrder.status === "DELIVERED" && <span className="kot-completion-note">Order completed.</span>}
                 {selectedOrder.status === "CANCELLED" && <span className="kot-completion-note">Order cancelled.</span>}
                 <div className="kot-total">Order total <strong>₹{selectedOrder.total.toFixed(2)}</strong></div>
-                <p className="kot-helper">Print KOT opens the Windows print dialog. Choose DCode DCRP30. Automatic printing remains off.</p>
+                <p className="kot-helper">Accepting an order with Auto-print ON sends both copies: customer receipt first, then kitchen ticket. Manual printing remains available for each copy separately.</p>
               </div>
             </div>
           </aside>
