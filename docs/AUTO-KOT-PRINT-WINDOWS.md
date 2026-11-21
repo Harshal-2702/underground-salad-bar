@@ -31,18 +31,18 @@ If Chrome is installed in a different location, browse to its actual `chrome.exe
 
 ## 3. Enable and test from Kitchen OS
 
-1. Open **Kitchen Orders → Design KOT**.
-2. Save the KOT template at **80mm** paper width.
-3. Switch **Auto-print** ON. The setting is saved in this browser profile.
-4. Choose **Print sample KOT silently**.
-5. Confirm that the POS-80C prints the sample without showing the browser print dialog.
-6. Only after the sample prints correctly, use a clearly labelled test order and click **Accept**. Its KOT should print automatically.
+1. Open **Orders → Design KOT**.
+2. Open **Customer Copy** and **Kitchen Copy** in turn. Save each design separately; use **80mm** paper width for the POS-80C.
+3. Use the sample print action on each tab to confirm each individual design prints correctly.
+4. Switch **Auto-print** ON. The setting is saved in this browser profile.
+5. Only after the samples print correctly, use a clearly labelled test order and click **Accept**. The automatic job prints the customer receipt first and then the kitchen ticket.
 
 ## Important behaviour
 
 - The automatic trigger is **staff acceptance**, not order arrival. New orders remain visible for review and will not print until staff accepts them.
+- One accepted website order sends two copies in order: the detailed **Customer Copy** first, followed by the **Kitchen Copy**. The two copies use independent saved designs and are separated in the print document.
 - The automatic print ID is saved locally in this browser profile to prevent repeat printing when the order list refreshes or React re-renders. The list is capped at the most recent 500 printed order IDs.
-- The existing **Print KOT** button remains available as a manual action. In the dedicated kiosk profile, Chrome sends it directly to the default printer too.
+- The order actions provide **Print both**, **Customer receipt**, and **Kitchen ticket** manual options. In the dedicated kiosk profile, Chrome sends the selected print job directly to the default printer too.
 - The Auto-print switch is local to this browser profile and starts OFF on other profiles/devices.
 - If the printer is offline, Windows may queue or fail the job. A browser print call confirms that the job was sent to the OS, not that paper physically emerged. Check the printer and Windows queue during the first test.
 - Chrome kiosk printing affects every print command issued by that dedicated Chrome instance. That is why the separate `C:\UKOS-Kiosk-Chrome` profile and shortcut are recommended.
