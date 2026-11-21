@@ -573,12 +573,27 @@ export default function OrdersPage({
   const selectedOrderIdRef = useRef<string | null>(null);
   const loadingRef = useRef(false);
 
-  const [templateData, setTemplateData] = useState<KotTemplateResponse | null>(null);
-  const [templateConfig, setTemplateConfig] = useState<KotTemplateConfig>(DEFAULT_TEMPLATE);
+  const [activeTemplateType, setActiveTemplateType] = useState<KotTemplateType>("KITCHEN");
+  const [templateDataByType, setTemplateDataByType] = useState<Record<KotTemplateType, KotTemplateResponse | null>>({ KITCHEN: null, CUSTOMER: null });
+  const [templateConfigs, setTemplateConfigs] = useState<Record<KotTemplateType, KotTemplateConfig>>({
+    KITCHEN: DEFAULT_KITCHEN_TEMPLATE,
+    CUSTOMER: DEFAULT_CUSTOMER_TEMPLATE,
+  });
+  const [draggedSection, setDraggedSection] = useState<KotSectionId | null>(null);
+  const [dragOverSection, setDragOverSection] = useState<KotSectionId | null>(null);
   const [templateLoading, setTemplateLoading] = useState(false);
   const [templateSaving, setTemplateSaving] = useState(false);
   const [templateError, setTemplateError] = useState("");
   const [templateNotice, setTemplateNotice] = useState("");
+
+  const templateData = templateDataByType[activeTemplateType];
+  const templateConfig = templateConfigs[activeTemplateType];
+  const setTemplateConfig = (updater: KotTemplateConfig | ((current: KotTemplateConfig) => KotTemplateConfig)) => {
+    setTemplateConfigs((current) => ({
+      ...current,
+      [activeTemplateType]: typeof updater === "function" ? updater(current[activeTemplateType]) : updater,
+    }));
+  };
   // Persisted settings drive live timer colours. Draft settings only change after Save.
   const [timingSettings, setTimingSettings] = useState<KotChannelTimingSetting[]>(timingDefault());
   const [timingSettingsDraft, setTimingSettingsDraft] = useState<KotChannelTimingSetting[]>(timingDefault());
@@ -713,20 +728,27 @@ export default function OrdersPage({
     setTemplateLoading(true);
     setTemplateError("");
     try {
-      const response = await fetch(`${API_URL}/kot/templates`, {
-        headers: { Authorization: `Bearer ${accessToken}` },
+      const types: KotTemplateType[] = ["KITCHEN", "CUSTOMER"];
+      const loaded = await Promise.all(types.map(async (type) => {
+        const response = await fetch(`${API_URL}/kot/templates?type=${type}`, {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+        const payload = await response.json().catch(() => null);
+        if (response.status === 401) {
+          await onSignOut();
+          throw new Error("Your session expired. Please sign in again.");
+        }
+        if (!response.ok) {
+          throw new Error(payload && typeof payload.error === "string" ? payload.error : `${type.toLowerCase()} template request failed (${response.status}).`);
+        }
+        return [type, payload as KotTemplateResponse] as const;
+      }));
+      const dataByType = Object.fromEntries(loaded) as Record<KotTemplateType, KotTemplateResponse>;
+      setTemplateDataByType(dataByType);
+      setTemplateConfigs({
+        KITCHEN: dataByType.KITCHEN.current.config ?? DEFAULT_KITCHEN_TEMPLATE,
+        CUSTOMER: dataByType.CUSTOMER.current.config ?? DEFAULT_CUSTOMER_TEMPLATE,
       });
-      const payload = await response.json().catch(() => null);
-      if (response.status === 401) {
-        await onSignOut();
-        throw new Error("Your session expired. Please sign in again.");
-      }
-      if (!response.ok) {
-        throw new Error(payload && typeof payload.error === "string" ? payload.error : `Template request failed (${response.status}).`);
-      }
-      const data = payload as KotTemplateResponse;
-      setTemplateData(data);
-      setTemplateConfig(data.current.config ?? DEFAULT_TEMPLATE);
     } catch (error) {
       setTemplateError(error instanceof Error ? error.message : "Unable to load KOT designer.");
     } finally {
@@ -738,6 +760,26 @@ export default function OrdersPage({
     void loadTemplate();
   }, [loadTemplate]);
 
+  const moveTemplateSection = (section: KotSectionId, destinationIndex: number) => {
+    setTemplateConfig((current) => {
+      const next = [...current.sectionOrder];
+      const sourceIndex = next.indexOf(section);
+      if (sourceIndex < 0 || destinationIndex < 0 || destinationIndex >= next.length) return current;
+      next.splice(sourceIndex, 1);
+      next.splice(destinationIndex, 0, section);
+      return { ...current, sectionOrder: next };
+    });
+  };
+
+  const dropTemplateSection = (target: KotSectionId) => {
+    if (draggedSection && draggedSection !== target) {
+      const currentOrder = templateConfig.sectionOrder;
+      const targetIndex = currentOrder.indexOf(target);
+      moveTemplateSection(draggedSection, targetIndex);
+    }
+    setDraggedSection(null);
+    setDragOverSection(null);
+  };
   const loadTimingSettings = useCallback(async () => {
     setTimingSettingsLoading(true);
     setTimingSettingsError("");
@@ -1081,7 +1123,7 @@ export default function OrdersPage({
           "Content-Type": "application/json",
           Authorization: `Bearer ${accessToken}`,
         },
-        body: JSON.stringify({ config: templateConfig }),
+        body: JSON.stringify({ type: activeTemplateType, config: templateConfig }),
       });
       const payload = await response.json().catch(() => null);
       if (response.status === 401) {
@@ -1091,7 +1133,7 @@ export default function OrdersPage({
       if (!response.ok) {
         throw new Error(payload && typeof payload.error === "string" ? payload.error : `Template save failed (${response.status}).`);
       }
-      setTemplateNotice(`KOT template v${payload.versionNumber} saved. Existing orders and historical template versions are unchanged.`);
+      setTemplateNotice(`${activeTemplateType === "CUSTOMER" ? "Customer receipt" : "Kitchen KOT"} template v${payload.versionNumber} saved. The other copy is unchanged.`);
       await loadTemplate();
     } catch (error) {
       setTemplateError(error instanceof Error ? error.message : "Unable to save KOT template.");
@@ -1101,8 +1143,8 @@ export default function OrdersPage({
   };
 
   const resetTemplate = () => {
-    setTemplateConfig(DEFAULT_TEMPLATE);
-    setTemplateNotice("Default settings loaded in the preview. Save to create a new template version.");
+    setTemplateConfig(defaultTemplate(activeTemplateType));
+    setTemplateNotice(`Default ${activeTemplateType === "CUSTOMER" ? "customer receipt" : "kitchen KOT"} design loaded in the preview. Save to create a new version.`);
     setTemplateError("");
   };
 
@@ -1117,7 +1159,7 @@ export default function OrdersPage({
           <div>
             <p className="kot-eyebrow">UNDERGROUND KITCHEN OS</p>
             <h1>KOT Designer</h1>
-            <p className="kot-muted">Use the Windows driver for manual or silent printing. Silent mode requires the dedicated Chrome --kiosk-printing shortcut.</p>
+            <p className="kot-muted">Design the customer receipt and kitchen ticket separately. Each copy has its own paper preview, content and section order.</p>
           </div>
           <div className="kot-header-actions">
             <button className="kot-button kot-button-secondary" onClick={() => setView("orders")}>Back to orders</button>
