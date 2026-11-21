@@ -1069,7 +1069,7 @@ export default function OrdersPage({
               <div className="kot-toggle-list">
                 <label><span>Brand name</span><input type="checkbox" checked={templateConfig.showBrandName} onChange={(event) => setTemplateConfig((value) => ({ ...value, showBrandName: event.target.checked }))}/></label>
                 <label><span>External order reference</span><input type="checkbox" checked={templateConfig.showExternalOrderReference} onChange={(event) => setTemplateConfig((value) => ({ ...value, showExternalOrderReference: event.target.checked }))}/></label>
-                <label><span>Customer first name only</span><input type="checkbox" checked={templateConfig.showCustomerFirstName} onChange={(event) => setTemplateConfig((value) => ({ ...value, showCustomerFirstName: event.target.checked }))}/></label>
+                <label><span>Show customer name</span><input type="checkbox" checked={templateConfig.showCustomerFirstName} onChange={(event) => setTemplateConfig((value) => ({ ...value, showCustomerFirstName: event.target.checked }))}/></label>
                 <label><span>Ingredient details</span><input type="checkbox" checked={templateConfig.showIngredients} onChange={(event) => setTemplateConfig((value) => ({ ...value, showIngredients: event.target.checked }))}/></label>
                 <label className="is-locked"><span>KOT number <small>Required</small></span><input type="checkbox" checked disabled/></label>
                 <label className="is-locked"><span>Order source <small>Required</small></span><input type="checkbox" checked disabled/></label>
