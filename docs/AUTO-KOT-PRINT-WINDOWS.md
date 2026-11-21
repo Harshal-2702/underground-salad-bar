@@ -17,10 +17,10 @@ Chrome kiosk printing sends all print jobs from that Chrome instance to the Wind
 1. Close every Chrome window. In the system tray, also exit Chrome if it is still running.
 2. Create a folder named `C:\UKOS-Kiosk-Chrome`.
 3. Right-click the desktop → **New → Shortcut**.
-4. For the shortcut target, use the following command. Replace `https://kitchen.undergroundsaladbar.in` with the actual Kitchen OS Admin URL:
+4. For the shortcut target, use the following command for the production Kitchen OS Admin:
 
 ```text
-"C:\Program Files\Google\Chrome\Application\chrome.exe" --user-data-dir="C:\UKOS-Kiosk-Chrome" --kiosk-printing <ADMIN-URL>
+"C:\Program Files\Google\Chrome\Application\chrome.exe" --user-data-dir="C:\UKOS-Kiosk-Chrome" --kiosk-printing https://kitchen.undergroundsaladbar.in
 ```
 
 If Chrome is installed in a different location, browse to its actual `chrome.exe` path and keep both command-line switches.
