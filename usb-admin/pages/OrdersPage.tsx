@@ -336,7 +336,9 @@ function escapePrintText(value: string): string {
 function buildKotTicketMarkup(order: OrderRecord, config: KotTemplateConfig, type: KotTemplateType): string {
   const details = customerDetails(order);
   const customerName = details.name.trim() || "Guest";
-  const deliveryCharge = Math.max(0, Number(order.deliveryCharge ?? 0));
+  const deliveryCharge = order.deliveryCharge === null || !Number.isFinite(Number(order.deliveryCharge))
+    ? null
+    : Math.max(0, Number(order.deliveryCharge));
   const itemsSubtotal = order.bowls.reduce((sum, bowl) => sum + Number(bowl.price || 0), 0);
   const money = (amount: number) => `₹${amount.toFixed(2)}`;
   const brand = config.showBrandName && config.headerText.trim()
@@ -372,7 +374,7 @@ function buildKotTicketMarkup(order: OrderRecord, config: KotTemplateConfig, typ
     items: `<div class="items">${itemRows || "<div>No items</div>"}</div>`,
     totals: type === "CUSTOMER" ? [
       config.showSubtotal ? `<div class="total-row"><span>Items subtotal</span><strong>${money(itemsSubtotal)}</strong></div>` : "",
-      config.showDeliveryCharge ? `<div class="total-row"><span>Delivery</span><strong>${deliveryCharge === 0 ? "FREE" : money(deliveryCharge)}</strong></div>` : "",
+      config.showDeliveryCharge ? `<div class="total-row"><span>Delivery</span><strong>${deliveryCharge === null ? "Not recorded" : deliveryCharge === 0 ? "FREE" : money(deliveryCharge)}</strong></div>` : "",
       config.showTotal ? `<div class="grand-total"><span>AMOUNT PAYABLE</span><strong>${money(order.total)}</strong></div>` : "",
       config.showPaymentMethod ? `<div class="meta">Payment: ${escapePrintText(order.paymentMethod)}</div>` : "",
     ].filter(Boolean).join("") : "",
@@ -952,7 +954,7 @@ export default function OrdersPage({
   const handleAutoPrintToggle = (enabled: boolean) => {
     setAutoPrintEnabled(enabled);
     setAutoPrintNotice(enabled
-      ? "Auto-print enabled on this browser. Use the dedicated Chrome --kiosk-printing shortcut and set DCode DCRP30 as the Windows default printer."
+      ? "Auto-print enabled on this browser. Use the dedicated Chrome --kiosk-printing shortcut and set POS-80C as the Windows default printer."
       : "Auto-print disabled. Orders will require manual printing.");
     try {
       window.localStorage.setItem("ukos.kot.autoPrintEnabled.v1", String(enabled));
@@ -1387,10 +1389,10 @@ export default function OrdersPage({
               </div>
 
               <div className="kot-panel kot-readiness-panel">
-                <div className="kot-panel-heading"><div><h2>Kitchen print settings</h2><p>Silent printing requires the dedicated Chrome shortcut and DCode as the Windows default.</p></div></div>
+                <div className="kot-panel-heading"><div><h2>Kitchen print settings</h2><p>Silent printing requires the dedicated Chrome shortcut and POS-80C as the Windows default.</p></div></div>
                 <div className="kot-readiness-row"><span>Automatic printing</span><strong>{autoPrintEnabled ? "ON · this browser" : "OFF · manual only"}</strong></div>
                 <div className="kot-readiness-row"><span>Auto-print trigger</span><strong>After staff acceptance</strong></div>
-                <div className="kot-readiness-row"><span>Printer</span><strong>DCode DCRP30 · Windows driver</strong></div>
+                <div className="kot-readiness-row"><span>Printer</span><strong>POS-80C · Windows driver</strong></div>
                 <div className="kot-readiness-row"><span>Default paper preview</span><strong>{templateConfig.paperWidth}</strong></div>
                 <div className="kot-readiness-row"><span>Website channel</span><strong className="kot-ready-text">Existing order flow</strong></div>
                 <div className="kot-readiness-row"><span>Zomato</span><strong className="kot-pending-text">Integration pending</strong></div>
@@ -1454,7 +1456,7 @@ export default function OrdersPage({
           </div>
           <div className="kot-live-tools">
             <label className="kot-sound-toggle"><input type="checkbox" checked={soundEnabled} onChange={(event) => handleSoundToggle(event.target.checked)}/> Sound alerts</label>
-            <label className="kot-auto-print-toggle" title="Auto-prints orders after staff acceptance. Silent printing requires the dedicated Chrome shortcut with --kiosk-printing and DCode DCRP30 as the Windows default printer.">
+            <label className="kot-auto-print-toggle" title="Auto-prints orders after staff acceptance. Silent printing requires the dedicated Chrome shortcut with --kiosk-printing and POS-80C as the Windows default printer.">
               <input type="checkbox" checked={autoPrintEnabled} onChange={(event) => handleAutoPrintToggle(event.target.checked)} aria-label="Enable automatic KOT printing after acceptance"/>
               <span>Auto-print</span><small>{autoPrintEnabled ? "ON · after acceptance" : "OFF · manual only"}</small>
             </label>
