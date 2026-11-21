@@ -64,6 +64,9 @@ type OrdersResponse = {
   channelCounts: Record<OrderChannel, number>;
 };
 
+type KotTemplateType = "KITCHEN" | "CUSTOMER";
+type KotSectionId = "order" | "customer" | "items" | "totals" | "special" | "footer";
+
 type KotTemplateConfig = {
   paperWidth: "58mm" | "80mm";
   headerText: string;
@@ -74,10 +77,19 @@ type KotTemplateConfig = {
   showChannel: true;
   showReceivedAt: true;
   showExternalOrderReference: boolean;
+  showInvoiceNumber: boolean;
   showCustomerFirstName: boolean;
+  showCustomerPhone: boolean;
+  showDeliveryAddress: boolean;
   showItems: true;
   showIngredients: boolean;
+  showItemPrices: boolean;
+  showSubtotal: boolean;
+  showDeliveryCharge: boolean;
+  showTotal: boolean;
+  showPaymentMethod: boolean;
   showSpecialInstructions: true;
+  sectionOrder: KotSectionId[];
   fontSize: number;
   headingWeight: "normal" | "bold";
   lineSpacing: "compact" | "normal" | "relaxed";
@@ -101,25 +113,63 @@ type KotTemplateResponse = {
   history: Array<{ id: string; versionNumber: number; isActive: boolean; createdAt: string; createdByEmail: string | null }>;
 };
 
-const DEFAULT_TEMPLATE: KotTemplateConfig = {
+const DEFAULT_SECTION_ORDER: KotSectionId[] = ["order", "customer", "items", "totals", "special", "footer"];
+
+const DEFAULT_KITCHEN_TEMPLATE: KotTemplateConfig = {
   paperWidth: "80mm",
   headerText: "UNDERGROUND KITCHEN",
-  footerText: "Thank you",
+  footerText: "",
   showBrandName: true,
   showLogo: false,
   showKotNumber: true,
   showChannel: true,
   showReceivedAt: true,
   showExternalOrderReference: true,
+  showInvoiceNumber: false,
   showCustomerFirstName: true,
+  showCustomerPhone: false,
+  showDeliveryAddress: false,
   showItems: true,
   showIngredients: true,
+  showItemPrices: false,
+  showSubtotal: false,
+  showDeliveryCharge: false,
+  showTotal: false,
+  showPaymentMethod: false,
   showSpecialInstructions: true,
+  sectionOrder: [...DEFAULT_SECTION_ORDER],
   fontSize: 12,
   headingWeight: "bold",
   lineSpacing: "normal",
   margin: "normal",
   alignment: "left",
+};
+
+const DEFAULT_CUSTOMER_TEMPLATE: KotTemplateConfig = {
+  ...DEFAULT_KITCHEN_TEMPLATE,
+  headerText: "UNDERGROUND SALAD BAR",
+  footerText: "Thank you for ordering!",
+  showInvoiceNumber: true,
+  showCustomerPhone: true,
+  showDeliveryAddress: true,
+  showItemPrices: true,
+  showSubtotal: true,
+  showDeliveryCharge: true,
+  showTotal: true,
+  showPaymentMethod: true,
+};
+
+function defaultTemplate(type: KotTemplateType): KotTemplateConfig {
+  return type === "CUSTOMER" ? DEFAULT_CUSTOMER_TEMPLATE : DEFAULT_KITCHEN_TEMPLATE;
+}
+
+const KOT_SECTION_LABELS: Record<KotSectionId, string> = {
+  order: "Order reference",
+  customer: "Customer details",
+  items: "Ordered bowls & ingredients",
+  totals: "Pricing & payment",
+  special: "Special instructions",
+  footer: "Footer message",
 };
 
 const STATUS_OPTIONS: Array<{ value: "ALL" | OrderStatusFilter; label: string }> = [
@@ -287,69 +337,131 @@ function escapePrintText(value: string): string {
   return value.replace(/[&<>"']/g, (character) => replacements[character] ?? character);
 }
 
-function buildKotPrintHtml(order: OrderRecord, config: KotTemplateConfig): string {
-  const width = config.paperWidth;
-  const contentWidth = width === "80mm" ? "72mm" : "48mm";
-  const margin = config.margin === "narrow" ? "1mm" : config.margin === "wide" ? "4mm" : "2mm";
+function buildKotTicketMarkup(order: OrderRecord, config: KotTemplateConfig, type: KotTemplateType): string {
+  const details = customerDetails(order);
+  const customerName = details.name.trim() || "Guest";
+  const deliveryCharge = Math.max(0, Number(order.deliveryCharge ?? 0));
+  const itemsSubtotal = order.bowls.reduce((sum, bowl) => sum + Number(bowl.price || 0), 0);
+  const money = (amount: number) => `₹${amount.toFixed(2)}`;
   const lineHeight = config.lineSpacing === "compact" ? 1.15 : config.lineSpacing === "relaxed" ? 1.65 : 1.35;
-  const customerName = customerDetails(order).name.trim() || "Guest";
-  const receivedAt = dateTimeLabel(order.createdAt);
-  const rows = order.bowls.map((bowl) => {
-    const details = config.showIngredients && bowl.details
-      ? `<div class="details">${escapePrintText(bowl.details).replace(/\r?\n/g, "<br>")}</div>`
-      : "";
-    return `<section class="item">
-      <div class="item-heading"><strong>${escapePrintText(String(bowl.quantity))} × ${escapePrintText(bowl.bowlName)}</strong></div>
-      ${details}
-    </section>`;
-  }).join("");
+  const contentWidth = config.paperWidth === "80mm" ? "72mm" : "48mm";
+  const margin = config.margin === "narrow" ? "1mm" : config.margin === "wide" ? "4mm" : "2mm";
   const brand = config.showBrandName && config.headerText.trim()
     ? `<div class="brand">${escapePrintText(config.headerText.trim())}</div>`
     : "";
-  const externalReference = config.showExternalOrderReference && order.externalOrderId
-    ? `<div class="meta">External ref: ${escapePrintText(order.externalOrderId)}</div>`
-    : "";
-  const customer = config.showCustomerFirstName
-    ? `<div class="meta">Customer: ${escapePrintText(customerName)}</div>`
-    : "";
-  const instructions = order.specialInstructions?.trim()
-    ? `<section class="special"><strong>Special instructions</strong><div>${escapePrintText(order.specialInstructions).replace(/\r?\n/g, "<br>")}</div></section>`
-    : "";
-  const footer = config.footerText.trim()
-    ? `<div class="footer">${escapePrintText(config.footerText.trim())}</div>`
-    : "";
+  const itemRows = order.bowls.map((bowl) => {
+    const itemDetails = config.showIngredients && bowl.details
+      ? `<div class="details">${escapePrintText(bowl.details).replace(/\r?\n/g, "<br>")}</div>`
+      : "";
+    const price = type === "CUSTOMER" && config.showItemPrices
+      ? `<div class="price">${money(Number(bowl.price || 0))}</div>`
+      : "";
+    return `<section class="item">
+      <div class="item-row"><strong>${escapePrintText(String(bowl.quantity))} × ${escapePrintText(bowl.bowlName)}</strong>${price}</div>
+      ${itemDetails}
+    </section>`;
+  }).join("");
+  const sections: Record<KotSectionId, string> = {
+    order: [
+      brand,
+      `<div class="copy-kind">${type === "CUSTOMER" ? "CUSTOMER COPY" : "KITCHEN COPY"}</div>`,
+      `<div class="kot">${escapePrintText(order.kotNumber)}</div>`,
+      `<div class="meta"><strong>Source:</strong> ${escapePrintText(channelLabel(order.channel))}</div>`,
+      `<div class="meta"><strong>Received:</strong> ${escapePrintText(dateTimeLabel(order.createdAt))}</div>`,
+      config.showExternalOrderReference && order.externalOrderId ? `<div class="meta">External ref: ${escapePrintText(order.externalOrderId)}</div>` : "",
+      type === "CUSTOMER" && config.showInvoiceNumber ? `<div class="meta">Invoice: ${escapePrintText(order.invoiceNumber)}</div>` : "",
+    ].filter(Boolean).join(""),
+    customer: [
+      config.showCustomerFirstName ? `<div class="customer-name">Customer: ${escapePrintText(customerName)}</div>` : "",
+      type === "CUSTOMER" && config.showCustomerPhone ? `<div class="meta">Phone: ${escapePrintText(details.phone)}</div>` : "",
+      type === "CUSTOMER" && config.showDeliveryAddress ? `<div class="meta">Delivery: ${escapePrintText([details.address, details.area, details.city].filter((part) => part && part !== "—").join(", "))}</div>` : "",
+    ].filter(Boolean).join(""),
+    items: `<div class="items">${itemRows || "<div>No items</div>"}</div>`,
+    totals: type === "CUSTOMER" ? [
+      config.showSubtotal ? `<div class="total-row"><span>Items subtotal</span><strong>${money(itemsSubtotal)}</strong></div>` : "",
+      config.showDeliveryCharge ? `<div class="total-row"><span>Delivery</span><strong>${deliveryCharge === 0 ? "FREE" : money(deliveryCharge)}</strong></div>` : "",
+      config.showTotal ? `<div class="grand-total"><span>AMOUNT PAYABLE</span><strong>${money(order.total)}</strong></div>` : "",
+      config.showPaymentMethod ? `<div class="meta">Payment: ${escapePrintText(order.paymentMethod)}</div>` : "",
+    ].filter(Boolean).join("") : "",
+    special: order.specialInstructions?.trim()
+      ? `<section class="special"><strong>Special instructions</strong><div>${escapePrintText(order.specialInstructions).replace(/\r?\n/g, "<br>")}</div></section>`
+      : "",
+    footer: config.footerText.trim() ? `<div class="footer">${escapePrintText(config.footerText.trim())}</div>` : "",
+  };
+
+  return config.sectionOrder.map((section, index) => {
+    const html = sections[section];
+    if (!html) return "";
+    return `${index > 0 ? '<div class="rule"></div>' : ""}${html}`;
+  }).join("");
+}
+
+function buildKotPrintHtml(order: OrderRecord, config: KotTemplateConfig, type: KotTemplateType): string {
   return `<!doctype html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${escapePrintText(order.kotNumber)}</title>
+<title>${escapePrintText(order.kotNumber)} · ${type === "CUSTOMER" ? "Customer copy" : "Kitchen copy"}</title>
 <style>
-  @page { size: ${width} auto; margin: 0; }
+  @page { size: 80mm auto; margin: 0; }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; background: #fff; color: #000; }
-  body { width: ${contentWidth}; padding: ${margin}; font-family: Arial, Helvetica, sans-serif; font-size: ${config.fontSize}px; line-height: ${lineHeight}; font-weight: ${config.headingWeight === "bold" ? 600 : 400}; }
-  .brand { text-align: ${config.alignment}; font-size: 1.15em; font-weight: 800; margin-bottom: 3mm; overflow-wrap: anywhere; }
-  .kot { text-align: ${config.alignment}; font-size: 1.55em; font-weight: 900; letter-spacing: .3px; margin-bottom: 1mm; }
+  body { width: 80mm; font-family: Arial, Helvetica, sans-serif; font-size: ${config.fontSize}px; line-height: ${config.lineSpacing === "compact" ? 1.15 : config.lineSpacing === "relaxed" ? 1.65 : 1.35}; }
+  .kot-ticket { width: ${config.paperWidth === "80mm" ? "72mm" : "48mm"}; padding: ${config.margin === "narrow" ? "1mm" : config.margin === "wide" ? "4mm" : "2mm"}; margin: 0 auto; font-weight: ${config.headingWeight === "bold" ? 400 : 400}; text-align: ${config.alignment}; overflow-wrap: anywhere; }
+  .brand { text-align: center; font-size: 1.15em; font-weight: 900; margin-bottom: 3mm; }
+  .copy-kind { text-align: center; font-size: .72em; font-weight: 800; letter-spacing: .8px; margin-bottom: 1mm; }
+  .kot { text-align: center; font-size: 1.55em; font-weight: 900; letter-spacing: .3px; margin-bottom: 1mm; }
+  .customer-name { font-size: 1.12em; font-weight: 800; margin: 1mm 0; }
   .meta { font-size: .9em; margin: .7mm 0; overflow-wrap: anywhere; }
   .rule { border-top: 1px dashed #000; margin: 2.2mm 0; }
   .item { padding: 1.4mm 0; border-bottom: 1px dashed #999; break-inside: avoid; }
-  .item-heading { font-size: 1.06em; font-weight: 800; overflow-wrap: anywhere; }
-  .details { margin-top: 1mm; padding-left: 2mm; font-size: .92em; font-weight: 400; overflow-wrap: anywhere; }
+  .item-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 3mm; font-size: 1.06em; }
+  .item-row strong { font-weight: 850; overflow-wrap: anywhere; }
+  .price { white-space: nowrap; font-weight: 750; }
+  .details { margin-top: 1mm; padding-left: 2mm; font-size: .92em; overflow-wrap: anywhere; }
+  .total-row { display: flex; justify-content: space-between; gap: 8px; padding: 1mm 0; font-size: .95em; }
+  .grand-total { display: flex; justify-content: space-between; gap: 8px; border-top: 1px solid #000; border-bottom: 1px solid #000; padding: 2.2mm 0; margin: 2mm 0; font-weight: 900; font-size: 1.12em; }
   .special { margin-top: 2.5mm; padding: 2mm; border: 1px solid #000; font-size: .96em; overflow-wrap: anywhere; }
   .special strong { display: block; text-transform: uppercase; margin-bottom: 1mm; }
   .footer { text-align: center; border-top: 1px dashed #000; margin-top: 3mm; padding-top: 2mm; font-size: .85em; overflow-wrap: anywhere; }
-  @media screen { body { margin: 8px auto; outline: 1px dashed #bbb; } }
-</style></head><body>
-  ${brand}
-  <div class="kot">${escapePrintText(order.kotNumber)}</div>
-  <div class="rule"></div>
-  <div class="meta"><strong>Source:</strong> ${escapePrintText(channelLabel(order.channel))}</div>
-  <div class="meta"><strong>Received:</strong> ${escapePrintText(receivedAt)}</div>
-  ${externalReference}
-  ${customer}
-  <div class="rule"></div>
-  ${rows || "<div>No items</div>"}
-  ${instructions}
-  ${footer}
-</body></html>`;
+  @media screen { body { margin: 8px auto; } .kot-ticket { outline: 1px dashed #bbb; } }
+</style></head><body><main class="kot-ticket">${buildKotTicketMarkup(order, config, type)}</main></body></html>`;
+}
+
+function buildBothKotPrintHtml(
+  order: OrderRecord,
+  customerConfig: KotTemplateConfig,
+  kitchenConfig: KotTemplateConfig,
+): string {
+  const customerTicket = buildKotTicketMarkup(order, customerConfig, "CUSTOMER");
+  const kitchenTicket = buildKotTicketMarkup(order, kitchenConfig, "KITCHEN");
+  const pageStyle = (config: KotTemplateConfig) => `width:${config.paperWidth === "80mm" ? "72mm" : "48mm"};padding:${config.margin === "narrow" ? "1mm" : config.margin === "wide" ? "4mm" : "2mm"};font-size:${config.fontSize}px;line-height:${config.lineSpacing === "compact" ? 1.15 : config.lineSpacing === "relaxed" ? 1.65 : 1.35};text-align:${config.alignment};`;
+  const sharedStyles = `
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;background:#fff;color:#000}
+    body{width:80mm;font-family:Arial,Helvetica,sans-serif}
+    .kot-ticket{margin:0 auto;overflow-wrap:anywhere;page-break-after:always;break-after:page}
+    .kot-ticket:last-child{page-break-after:auto;break-after:auto}
+    .brand{text-align:center;font-size:1.15em;font-weight:900;margin-bottom:3mm}
+    .copy-kind{text-align:center;font-size:.72em;font-weight:800;letter-spacing:.8px;margin-bottom:1mm}
+    .kot{text-align:center;font-size:1.55em;font-weight:900;letter-spacing:.3px;margin-bottom:1mm}
+    .customer-name{font-size:1.12em;font-weight:800;margin:1mm 0}
+    .meta{font-size:.9em;margin:.7mm 0;overflow-wrap:anywhere}
+    .rule{border-top:1px dashed #000;margin:2.2mm 0}
+    .item{padding:1.4mm 0;border-bottom:1px dashed #999;break-inside:avoid}
+    .item-row{display:flex;justify-content:space-between;align-items:flex-start;gap:3mm;font-size:1.06em}
+    .item-row strong{font-weight:850;overflow-wrap:anywhere}
+    .price{white-space:nowrap;font-weight:750}
+    .details{margin-top:1mm;padding-left:2mm;font-size:.92em;overflow-wrap:anywhere}
+    .total-row{display:flex;justify-content:space-between;gap:8px;padding:1mm 0;font-size:.95em}
+    .grand-total{display:flex;justify-content:space-between;gap:8px;border-top:1px solid #000;border-bottom:1px solid #000;padding:2.2mm 0;margin:2mm 0;font-weight:900;font-size:1.12em}
+    .special{margin-top:2.5mm;padding:2mm;border:1px solid #000;font-size:.96em;overflow-wrap:anywhere}
+    .special strong{display:block;text-transform:uppercase;margin-bottom:1mm}
+    .footer{text-align:center;border-top:1px dashed #000;margin-top:3mm;padding-top:2mm;font-size:.85em;overflow-wrap:anywhere}
+    @media screen{body{margin:8px auto}.kot-ticket{outline:1px dashed #bbb}}
+  `;
+  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapePrintText(order.kotNumber)} · Customer + Kitchen copies</title><style>@page{size:80mm auto;margin:0}${sharedStyles}</style></head><body>
+    <main class="kot-ticket" style="${pageStyle(customerConfig)}">${customerTicket}</main>
+    <main class="kot-ticket" style="${pageStyle(kitchenConfig)}">${kitchenTicket}</main>
+  </body></html>`;
 }
 
 function sampleKotOrder(): OrderRecord {
