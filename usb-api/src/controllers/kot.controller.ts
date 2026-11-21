@@ -3,14 +3,23 @@ import { prisma } from "../lib/prisma.js";
 import {
   getKotTemplate,
   saveKotTemplate,
+  type KotTemplateType,
   getKotChannelTimingSettings,
   saveKotChannelTimingSettings,
   KotValidationError,
 } from "../services/kot.service.js";
 
-export async function getActiveKotTemplate(_req: Request, res: Response) {
+function readTemplateType(value: unknown): KotTemplateType | null {
+  if (value === undefined || value === null || value === "" || value === "KITCHEN") return "KITCHEN";
+  if (value === "CUSTOMER") return "CUSTOMER";
+  return null;
+}
+
+export async function getActiveKotTemplate(req: Request, res: Response) {
   try {
-    return res.json(await getKotTemplate(prisma));
+    const type = readTemplateType(req.query.type);
+    if (!type) return res.status(400).json({ error: "Template type must be KITCHEN or CUSTOMER." });
+    return res.json(await getKotTemplate(prisma, type));
   } catch (error) {
     console.error("KOT template read failed", { name: (error as any)?.name, code: (error as any)?.code });
     return res.status(500).json({ error: "Unable to load KOT template settings." });
@@ -19,7 +28,10 @@ export async function getActiveKotTemplate(_req: Request, res: Response) {
 
 export async function createKotTemplateVersion(req: Request, res: Response) {
   try {
-    const version = await saveKotTemplate(prisma, req.body?.config);
+    const type = readTemplateType(req.body?.type);
+    if (!type) return res.status(400).json({ error: "Template type must be KITCHEN or CUSTOMER." });
+    const email = typeof res.locals.adminEmail === "string" ? res.locals.adminEmail : null;
+    const version = await saveKotTemplate(prisma, req.body?.config, type, email);
     return res.status(201).json(version);
   } catch (error) {
     if (error instanceof KotValidationError) {

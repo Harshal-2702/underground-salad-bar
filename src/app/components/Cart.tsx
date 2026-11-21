@@ -58,7 +58,7 @@ onBuildAnother,
 
 }: CartProps){
   const [view, setView] = useState<CartView>('cart');
-  const [form, setForm] = useState({ name: '', phone: '', address: '', area: '', city: 'Pune' });
+  const [form, setForm] = useState({ firstName: '', lastName: '', phone: '', address: '', area: '', city: 'Pune' });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const grandTotal = bowls.reduce((sum, bowl) => sum + bowl.total, 0);
@@ -161,7 +161,8 @@ const deleteIngredient = (bowlId: string, itemId: string) => {
 
   const validate = () => {
     const e: Record<string, string> = {};
-    if (!form.name.trim()) e.name = 'Name is required';
+    if (!form.firstName.trim()) e.firstName = 'First name is required';
+    if (!form.lastName.trim()) e.lastName = 'Last name is required';
     if (!/^[6-9]\d{9}$/.test(form.phone)) e.phone = 'Enter a valid 10-digit phone number';
     if (!form.address.trim()) e.address = 'Address is required';
     if (!form.area) e.area = 'Please select your area';
@@ -188,7 +189,7 @@ try {
       },
 
 body: JSON.stringify({
-  customerName: form.name,
+  customerName: [form.firstName.trim(), form.lastName.trim()].filter(Boolean).join(' '),
   phone: form.phone,
   address: form.address,
   area: form.area,
@@ -493,17 +494,34 @@ setView("success");
                 </button>
 
                 <div className="space-y-4">
-                  {/* Name */}
-                  <div>
-                    <label className="font-['Sora'] text-sm font-semibold text-[#1F3D2B] block mb-1.5">Full Name *</label>
-                    <input
-                      type="text"
-                      placeholder="Rahul Sharma"
-                      value={form.name}
-                      onChange={e => { setForm(f => ({ ...f, name: e.target.value })); setErrors(err => ({ ...err, name: '' })); }}
-                      className={`w-full px-4 py-3 rounded-xl border font-['Sora'] text-sm bg-white outline-none transition-colors ${errors.name ? 'border-red-400' : 'border-[#1A1209]/15 focus:border-[#1F3D2B]'}`}
-                    />
-                    {errors.name && <p className="font-['Sora'] text-red-500 text-xs mt-1">{errors.name}</p>}
+                  {/* First and last name are collected separately and stored as one full customer name. */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="font-['Sora'] text-sm font-semibold text-[#1F3D2B] block mb-1.5">First Name *</label>
+                      <input
+                        type="text"
+                        autoComplete="given-name"
+                        placeholder="Rahul"
+                        maxLength={50}
+                        value={form.firstName}
+                        onChange={e => { setForm(f => ({ ...f, firstName: e.target.value })); setErrors(err => ({ ...err, firstName: '' })); }}
+                        className={`w-full px-4 py-3 rounded-xl border font-['Sora'] text-sm bg-white outline-none transition-colors ${errors.firstName ? 'border-red-400' : 'border-[#1A1209]/15 focus:border-[#1F3D2B]'}`}
+                      />
+                      {errors.firstName && <p className="font-['Sora'] text-red-500 text-xs mt-1">{errors.firstName}</p>}
+                    </div>
+                    <div>
+                      <label className="font-['Sora'] text-sm font-semibold text-[#1F3D2B] block mb-1.5">Last Name *</label>
+                      <input
+                        type="text"
+                        autoComplete="family-name"
+                        placeholder="Sharma"
+                        maxLength={50}
+                        value={form.lastName}
+                        onChange={e => { setForm(f => ({ ...f, lastName: e.target.value })); setErrors(err => ({ ...err, lastName: '' })); }}
+                        className={`w-full px-4 py-3 rounded-xl border font-['Sora'] text-sm bg-white outline-none transition-colors ${errors.lastName ? 'border-red-400' : 'border-[#1A1209]/15 focus:border-[#1F3D2B]'}`}
+                      />
+                      {errors.lastName && <p className="font-['Sora'] text-red-500 text-xs mt-1">{errors.lastName}</p>}
+                    </div>
                   </div>
 
                   {/* Phone */}
@@ -611,7 +629,7 @@ setView("success");
                 </p>
               )}
               <p className="font-['Sora'] text-[#1A1209]/60 text-sm mb-2 leading-relaxed">
-                Hi {form.name || 'there'}! We'll call you at {form.phone || 'your number'} once your bowl is on the way.
+                Hi {[form.firstName, form.lastName].map((part) => part.trim()).filter(Boolean).join(' ') || 'there'}! We'll call you at {form.phone || 'your number'} once your bowl is on the way.
               </p>
               <p className="font-['Sora'] text-[#1A1209]/40 text-xs mb-10">
                 Estimated delivery: 25–35 minutes to {form.area || 'your area'}, Pune
