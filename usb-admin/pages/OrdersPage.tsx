@@ -1109,6 +1109,7 @@ export default function OrdersPage({
       {notice && <div className="kot-alert kot-alert-success" role="status">{notice}</div>}
       {printError && <ApiError>{printError}</ApiError>}
       {printNotice && <div className="kot-alert kot-alert-success" role="status">{printNotice}</div>}
+      {autoPrintNotice && <div className="kot-alert kot-alert-success" role="status">{autoPrintNotice}</div>}
 
       <section className="kot-stat-grid" aria-label="Today's order status counts">
         <div className="kot-stat-card"><span>New</span><strong>{countNew}</strong><small>Awaiting acceptance</small></div>

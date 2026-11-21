@@ -31,7 +31,7 @@
 .kot-live-tools{display:flex;align-items:center;gap:13px;flex-wrap:wrap}
 .kot-live-indicator{font-size:11px;color:#617166;display:inline-flex;align-items:center;gap:6px}
 .kot-live-indicator i{width:7px;height:7px;border-radius:50%;background:#279b55;box-shadow:0 0 0 3px #e1f2e6}
-.kot-sound-toggle,.kot-auto-print-toggle{font-size:12px;color:#657168;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}.kot-sound-toggle input,.kot-auto-print-toggle input{accent-color:#1f3d2b}.kot-auto-print-toggle{opacity:.72}.kot-auto-print-toggle small{font-size:10px;color:#89948b}
+.kot-sound-toggle,.kot-auto-print-toggle{font-size:12px;color:#657168;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}.kot-sound-toggle input,.kot-auto-print-toggle input{accent-color:#1f3d2b}.kot-auto-print-toggle{opacity:1}.kot-auto-print-toggle small{font-size:10px;color:#89948b}
 .kot-icon-button{border:1px solid #dfe6de;background:white;border-radius:8px;color:#304b36;padding:8px 10px;font-size:12px;font-weight:650;cursor:pointer}
 .kot-filter-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .kot-segmented{display:inline-flex;border:1px solid #dce4db;background:#f7f9f6;padding:3px;border-radius:9px;gap:2px}
