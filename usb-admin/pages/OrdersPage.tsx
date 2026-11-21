@@ -940,7 +940,7 @@ export default function OrdersPage({
           <div>
             <p className="kot-eyebrow">UNDERGROUND KITCHEN OS</p>
             <h1>KOT Designer</h1>
-            <p className="kot-muted">Design and print KOTs using the Windows driver. Silent automatic printing remains disabled.</p>
+            <p className="kot-muted">Use the Windows driver for manual or silent printing. Silent mode requires the dedicated Chrome --kiosk-printing shortcut.</p>
           </div>
           <div className="kot-header-actions">
             <button className="kot-button kot-button-secondary" onClick={() => setView("orders")}>Back to orders</button>
@@ -952,7 +952,7 @@ export default function OrdersPage({
         {templateNotice && <div className="kot-alert kot-alert-success" role="status">{templateNotice}</div>}
         {printError && <ApiError>{printError}</ApiError>}
         {printNotice && <div className="kot-alert kot-alert-success" role="status">{printNotice}</div>}
-      {autoPrintNotice && <div className="kot-alert kot-alert-success" role="status">{autoPrintNotice}</div>}
+        {autoPrintNotice && <div className="kot-alert kot-alert-success" role="status">{autoPrintNotice}</div>}
 
         {templateLoading ? (
           <div className="kot-empty"><div className="kot-spinner"/>Loading template settings…</div>
@@ -1058,9 +1058,9 @@ export default function OrdersPage({
               </div>
 
               <div className="kot-panel kot-readiness-panel">
-                <div className="kot-panel-heading"><div><h2>Kitchen print settings</h2><p>Manual printing uses the Windows driver; silent printing remains disabled.</p></div></div>
-                <div className="kot-readiness-row"><span>Automatic printing</span><label className="kot-disabled-switch"><input type="checkbox" disabled/><strong>OFF · KOT-03</strong></label></div>
-                <div className="kot-readiness-row"><span>Planned auto-print trigger</span><strong>After staff acceptance</strong></div>
+                <div className="kot-panel-heading"><div><h2>Kitchen print settings</h2><p>Silent printing requires the dedicated Chrome shortcut and DCode as the Windows default.</p></div></div>
+                <div className="kot-readiness-row"><span>Automatic printing</span><strong>{autoPrintEnabled ? "ON · this browser" : "OFF · manual only"}</strong></div>
+                <div className="kot-readiness-row"><span>Auto-print trigger</span><strong>After staff acceptance</strong></div>
                 <div className="kot-readiness-row"><span>Printer</span><strong>DCode DCRP30 · Windows driver</strong></div>
                 <div className="kot-readiness-row"><span>Default paper preview</span><strong>{templateConfig.paperWidth}</strong></div>
                 <div className="kot-readiness-row"><span>Website channel</span><strong className="kot-ready-text">Existing order flow</strong></div>
@@ -1068,8 +1068,8 @@ export default function OrdersPage({
                 <div className="kot-readiness-row"><span>Swiggy</span><strong className="kot-pending-text">Integration pending</strong></div>
               </div>
               <div className="kot-note-card">
-                <strong>Manual printing test</strong>
-                <p>Print a sample ticket through the Windows printer driver. This opens the browser print dialog; automatic silent printing remains disabled until the local print bridge is installed and tested.</p>
+                <strong>Printer test</strong>
+                <p>{autoPrintEnabled ? "Send a sample ticket through Chrome silent printing. Confirm that it prints without a browser dialog." : "Print a sample ticket through the Windows printer driver. This opens the browser print dialog; enable Auto-print and use the dedicated Chrome kiosk shortcut to test silent printing."}</p>
                 <button type="button" className="kot-button kot-button-primary kot-print-sample" onClick={() => autoPrintEnabled ? printKotAutomatically(sampleKotOrder(), true) : printKot(sampleKotOrder())} disabled={printingOrderId !== null || templateLoading}>
                   {printingOrderId === "sample-kot" ? "Sending sample…" : autoPrintEnabled ? "Print sample KOT silently" : "Print sample KOT"}
                 </button>
