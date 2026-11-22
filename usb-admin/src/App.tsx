@@ -3,7 +3,7 @@ import OrdersPage from "../pages/OrdersPage";
 import IngredientsPage from "./pages/IngredientsPage";
 import RecipesPage from "./pages/RecipesPage";
 import PurchasesPage from "./pages/PurchasesPage";
-import ReportsPage from "../../pages/ReportsPage";
+import ReportsPage from "../pages/ReportsPage";
 import { AuthProvider, useAuth } from "./auth/AuthContext";
 import LoginPage from "./auth/LoginPage";
 import SetPasswordPage from "./auth/SetPasswordPage";
