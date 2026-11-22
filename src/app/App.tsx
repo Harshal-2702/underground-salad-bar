@@ -203,6 +203,6 @@ const [subscriptions, setSubscriptions] = useState<SubscriptionPlan[]>([]);
 
 
 export default function App() {
-  const path = typeof window === "undefined" ? "/" : window.location.pathname.replace(/\\/+$/, "") || "/";
+  const path = typeof window === "undefined" ? "/" : window.location.pathname.replace(/\/+$/, "") || "/";
   return path === "/quick-order" ? <QuickOrderPage /> : <MainWebsite />;
 }
