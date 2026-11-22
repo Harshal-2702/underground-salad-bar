@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { API_URL } from "../usb-admin/src/config.ts";
 import "../usb-admin/src/reports.css";
 
@@ -10,7 +10,7 @@ type AnyRecord = Record<string, any>;
 type ReportDashboard = {
   filters: { from: string; to: string; channel: ReportChannel };
   generatedAt: string;
-  rowLimits: { ordersTruncated: boolean; purchasesTruncated: boolean };
+  rowLimits: { ordersTruncated: boolean; purchasesTruncated: boolean; orderDetailsSampled?: boolean; purchaseDetailsSampled?: boolean };
   overview: AnyRecord;
   sales: AnyRecord;
   kitchen: AnyRecord;
@@ -251,7 +251,9 @@ function buildWorkbook(sheets: WorkbookSheet[]): Blob {
     { name: "xl/styles.xml", text: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Aptos"/></font><font><b/><color rgb="FFFFFFFF"/><sz val="11"/><name val="Aptos"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF244C34"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>' },
     ...safeSheets.map((sheet, index) => ({ name: "xl/worksheets/sheet" + (index + 1) + ".xml", text: sheetXml(sheet.rows) })),
   ];
-  return new Blob([zipStore(files)], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  const bytes = zipStore(files);
+  const data = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+  return new Blob([data], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
 }
 
 function buildReportSheets(report: ReportDashboard): WorkbookSheet[] {
@@ -344,7 +346,7 @@ function MetricCard({ label, value, note, tone = "" }: { label: string; value: s
   </article>;
 }
 
-function Panel({ id, title, subtitle, children }: { id?: string; title: string; subtitle?: string; children: React.ReactNode }) {
+function Panel({ id, title, subtitle, children }: { id?: string; title: string; subtitle?: string; children: ReactNode }) {
   return <section className="reports-panel" id={id}>
     <header className="reports-panel-heading"><div><h2>{title}</h2>{subtitle && <p>{subtitle}</p>}</div></header>
     {children}
@@ -503,7 +505,7 @@ export default function ReportsPage({
     if (!comparison || !report) return null;
     return {
       orderValue: changeLabel(report.overview.orderValue, comparison.overview.orderValue),
-      orders: changeLabel(report.overview.nonCancelledOrders, comparison.overview.nonCancelledOrders),
+      orders: changeLabel(report.overview.totalOrders, comparison.overview.totalOrders),
       purchaseSpend: changeLabel(report.overview.purchaseSpend, comparison.overview.purchaseSpend),
     };
   }, [comparison, report]);
@@ -641,7 +643,7 @@ export default function ReportsPage({
             <p className="reports-footnote">The report uses the configured SLA thresholds for each channel.</p>
           </Panel>
         </div>
-        <Panel title="Active kitchen alerts" subtitle="Orders currently beyond configured amber or late timing thresholds.">
+        <Panel title="Kitchen timing by channel" subtitle="Average saved durations for non-cancelled records in the returned detail set.">\n          <div className="reports-desktop-table"><div className="reports-table-scroll"><table><thead><tr><th>Channel</th><th>Acceptance avg.</th><th>Recorded</th><th>Preparation avg.</th><th>Recorded</th><th>Ready → handover avg.</th></tr></thead><tbody>\n            {(report.kitchen.operationsByChannel ?? []).map((row: AnyRecord) => <tr key={row.channel}><td>{channelName(row.channel)}</td><td>{formatDuration(row.averageAcceptanceSeconds)}</td><td>{formatNumber(row.acceptanceCount)}</td><td>{formatDuration(row.averagePreparationSeconds)}</td><td>{formatNumber(row.preparationCount)}</td><td>{formatDuration(row.averageReadyToHandoverSeconds)}</td></tr>)}\n          </tbody></table></div></div>\n          <div className="reports-mobile-records">{(report.kitchen.operationsByChannel ?? []).map((row: AnyRecord) => <article className="reports-record-card" key={row.channel}>\n            <strong>{channelName(row.channel)}</strong><dl><div><dt>Acceptance avg.</dt><dd>{formatDuration(row.averageAcceptanceSeconds)} ({row.acceptanceCount})</dd></div><div><dt>Preparation avg.</dt><dd>{formatDuration(row.averagePreparationSeconds)} ({row.preparationCount})</dd></div><div><dt>Ready → handover</dt><dd>{formatDuration(row.averageReadyToHandoverSeconds)}</dd></div></dl>\n          </article>)}</div>\n          <p className="reports-footnote">Per-channel timing rows use the latest 5,000 order detail records when that high-volume safeguard is reached.</p>\n        </Panel>\n        <Panel title="Active kitchen alerts" subtitle="Orders currently beyond configured amber or late timing thresholds from the selected-period detail set.">
           {(report.kitchen.activeLateOrders ?? []).length ? <div className="reports-alert-list">{report.kitchen.activeLateOrders.map((row: AnyRecord, index: number) =>
             <article key={row.kotNumber + "-" + row.stage + "-" + index}><div><strong>{row.kotNumber}</strong><span>{row.stage}</span></div><small>{channelName(row.channel)} · {formatDuration(row.elapsedSeconds)} elapsed · threshold {row.lateThresholdMinutes ?? "—"} min</small></article>
           )}</div> : <p className="reports-empty-inline">No active orders are currently beyond configured amber thresholds.</p>}
