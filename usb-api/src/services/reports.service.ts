@@ -46,6 +46,10 @@ function indiaDateKey(value: Date): string {
   return part("year") + "-" + part("month") + "-" + part("day");
 }
 
+function indiaWeekday(value: Date): string {
+  return new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Kolkata", weekday: "long" }).format(value);
+}
+
 function indiaHour(value: Date): number {
   const hour = new Intl.DateTimeFormat("en-GB", {
     timeZone: "Asia/Kolkata", hour: "2-digit", hourCycle: "h23",
@@ -172,6 +176,7 @@ export async function getReportDashboard(filters: ReportFilters) {
   const areaMap = new Map<string, { label: string; count: number; amount: number }>();
   const trendMap = new Map<string, { date: string; orders: number; orderValue: number; cancelled: number }>();
   const hourMap = new Map<number, number>();
+  const weekdayMap = new Map<string, { label: string; count: number; orderValue: number }>();
   const acceptanceDurations: number[] = [];
   const preparationDurations: number[] = [];
   const handoverDurations: number[] = [];
@@ -206,6 +211,11 @@ export async function getReportDashboard(filters: ReportFilters) {
     if (order.deliveryArea?.trim()) addGroup(areaMap, order.deliveryArea.trim().toLowerCase(), order.deliveryArea.trim(), isCancelled ? 0 : total);
     const hour = indiaHour(order.createdAt);
     hourMap.set(hour, (hourMap.get(hour) ?? 0) + 1);
+    const weekday = indiaWeekday(order.createdAt);
+    const weekdayGroup = weekdayMap.get(weekday) ?? { label: weekday, count: 0, orderValue: 0 };
+    weekdayGroup.count += 1;
+    if (!isCancelled) weekdayGroup.orderValue += total;
+    weekdayMap.set(weekday, weekdayGroup);
 
     const setting = settingsByChannel.get(order.channel);
     const channelTiming = channelOperations.get(order.channel) ?? { acceptance: [], preparation: [], handover: [] };
@@ -282,20 +292,24 @@ export async function getReportDashboard(filters: ReportFilters) {
     cursor.setUTCDate(cursor.getUTCDate() + 1);
   }
 
-  const channelAggregates = new Map<string, { count: number; orderValue: number; cancelled: number }>();
+  const channelAggregates = new Map<string, { count: number; nonCancelledCount: number; orderValue: number; cancelled: number }>();
   for (const group of channelStatusAggregates) {
-    const aggregate = channelAggregates.get(group.channel) ?? { count: 0, orderValue: 0, cancelled: 0 };
+    const aggregate = channelAggregates.get(group.channel) ?? { count: 0, nonCancelledCount: 0, orderValue: 0, cancelled: 0 };
     aggregate.count += group._count._all;
     if (group.status === "CANCELLED") aggregate.cancelled += group._count._all;
-    else aggregate.orderValue += money(group._sum.total);
+    else {
+      aggregate.nonCancelledCount += group._count._all;
+      aggregate.orderValue += money(group._sum.total);
+    }
     channelAggregates.set(group.channel, aggregate);
   }
   const channelMix = ["WEBSITE", "ZOMATO", "SWIGGY"].map((channel) => {
-    const group = channelAggregates.get(channel) ?? { count: 0, orderValue: 0, cancelled: 0 };
-    return { channel, label: channel === "WEBSITE" ? "Website" : channel === "ZOMATO" ? "Zomato" : "Swiggy", count: group.count, orderValue: group.orderValue, cancelled: group.cancelled };
+    const group = channelAggregates.get(channel) ?? { count: 0, nonCancelledCount: 0, orderValue: 0, cancelled: 0 };
+    return { channel, label: channel === "WEBSITE" ? "Website" : channel === "ZOMATO" ? "Zomato" : "Swiggy", count: group.count, nonCancelledCount: group.nonCancelledCount, orderValue: group.orderValue, averageOrderValue: group.nonCancelledCount ? group.orderValue / group.nonCancelledCount : 0, cancelled: group.cancelled };
   });
   const areaMix = sortedGroups(areaMap);
   const peakHours = [...hourMap.entries()].map(([hour, count]) => ({ hour, label: String(hour).padStart(2, "0") + ":00", count })).sort((a, b) => b.count - a.count);
+  const busiestDays = [...weekdayMap.values()].sort((a, b) => b.count - a.count);
   const longestPreparation = orders
     .filter((order) => order.preparationDurationSeconds != null)
     .sort((a, b) => (b.preparationDurationSeconds ?? 0) - (a.preparationDurationSeconds ?? 0))
@@ -319,7 +333,7 @@ export async function getReportDashboard(filters: ReportFilters) {
     if (transaction.voidedAt) {
       voidedPurchaseCount += 1;
       voidedTransactions.push({
-        reference: transaction.reference, totalAmount: money(transaction.totalAmount),
+        reference: transaction.reference, totalAmount: transaction.sheets.reduce((sheetTotal, sheet) => sheetTotal + sheet.lines.reduce((lineTotal, line) => lineTotal + money(line.itemAmount), 0), 0),
         voidedAt: transaction.voidedAt, voidedByEmail: transaction.voidedByEmail,
         voidReason: transaction.voidReason, createdAt: transaction.createdAt,
       });
@@ -430,7 +444,7 @@ export async function getReportDashboard(filters: ReportFilters) {
       averageReadyToHandoverSeconds: average(handoverDurations),
     },
     sales: {
-      trend, channelMix, areaMix, peakHours: peakHours.slice(0, 8),
+      trend, channelMix, areaMix, peakHours: peakHours.slice(0, 8), busiestDays,
       statusCounts, totalOrders: totalOrderCount,
       cancellationByChannel: channelMix.map((item) => ({ channel: item.channel, cancelled: item.cancelled })),
       orders: orders.map((order) => ({
