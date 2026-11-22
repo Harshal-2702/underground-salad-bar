@@ -98,7 +98,7 @@ export async function getReportDashboard(filters: ReportFilters) {
     sheets: { some: { purchaseDate: { gte: range.dateStart, lt: range.dateEnd } } },
   };
 
-  const [ordersRaw, purchaseTransactionsRaw, latestStocktake, stocktakeHistory, timingSettings] = await Promise.all([
+  const [ordersRaw, purchaseTransactionsRaw, latestStocktake, stocktakeHistory, timingSettings, totalOrderCount, orderStatusAggregates, channelStatusAggregates, orderTimingAggregates] = await Promise.all([
     prisma.order.findMany({
       where: orderWhere,
       orderBy: [{ createdAt: "desc" }, { kotSequence: "desc" }],
@@ -155,6 +155,14 @@ export async function getReportDashboard(filters: ReportFilters) {
       },
     }),
     prisma.kotChannelTimingSetting.findMany(),
+    prisma.order.count({ where: orderWhere }),
+    prisma.order.groupBy({ by: ["status"], where: orderWhere, _count: { _all: true }, _sum: { total: true } }),
+    prisma.order.groupBy({ by: ["channel", "status"], where: orderWhere, _count: { _all: true }, _sum: { total: true } }),
+    prisma.order.aggregate({
+      where: { ...orderWhere, status: { not: "CANCELLED" } },
+      _avg: { acceptanceDurationSeconds: true, preparationDurationSeconds: true },
+      _count: { acceptanceDurationSeconds: true, preparationDurationSeconds: true },
+    }),
   ]);
 
   const orders = ordersRaw.slice(0, 5000);
@@ -183,8 +191,17 @@ export async function getReportDashboard(filters: ReportFilters) {
   let cancelledCount = 0;
 
   const settingsByChannel = new Map(timingSettings.map((setting) => [setting.channel, setting]));
+  for (const status of Object.values(OrderStatus)) statusCounts[status] = 0;
+  for (const group of orderStatusAggregates) statusCounts[group.status] = group._count._all;
+  const exactCancelledGroup = orderStatusAggregates.find((group) => group.status === "CANCELLED");
+  const exactCancelledCount = exactCancelledGroup?._count._all ?? 0;
+  const exactCancelledValue = money(exactCancelledGroup?._sum.total);
+  const exactNonCancelledGroups = orderStatusAggregates.filter((group) => group.status !== "CANCELLED");
+  const exactNonCancelledCount = exactNonCancelledGroups.reduce((sum, group) => sum + group._count._all, 0);
+  const exactOrderValue = exactNonCancelledGroups.reduce((sum, group) => sum + money(group._sum.total), 0);
+  const exactDeliveryCharges = 0;
   for (const order of orders) {
-    statusCounts[order.status] = (statusCounts[order.status] ?? 0) + 1;
+    // Aggregate status totals are loaded separately without the detail-row cap.
     const isCancelled = order.status === "CANCELLED";
     const total = money(order.total);
     const dayKey = indiaDateKey(order.createdAt);
@@ -283,9 +300,17 @@ export async function getReportDashboard(filters: ReportFilters) {
     cursor.setUTCDate(cursor.getUTCDate() + 1);
   }
 
+  const channelAggregates = new Map<string, { count: number; orderValue: number; cancelled: number }>();
+  for (const group of channelStatusAggregates) {
+    const aggregate = channelAggregates.get(group.channel) ?? { count: 0, orderValue: 0, cancelled: 0 };
+    aggregate.count += group._count._all;
+    if (group.status === "CANCELLED") aggregate.cancelled += group._count._all;
+    else aggregate.orderValue += money(group._sum.total);
+    channelAggregates.set(group.channel, aggregate);
+  }
   const channelMix = ["WEBSITE", "ZOMATO", "SWIGGY"].map((channel) => {
-    const group = channelMap.get(channel);
-    return { channel, label: group?.label ?? (channel === "WEBSITE" ? "Website" : channel === "ZOMATO" ? "Zomato" : "Swiggy"), count: group?.count ?? 0, orderValue: group?.amount ?? 0 };
+    const group = channelAggregates.get(channel) ?? { count: 0, orderValue: 0, cancelled: 0 };
+    return { channel, label: channel === "WEBSITE" ? "Website" : channel === "ZOMATO" ? "Zomato" : "Swiggy", count: group.count, orderValue: group.orderValue, cancelled: group.cancelled };
   });
   const areaMix = sortedGroups(areaMap);
   const peakHours = [...hourMap.entries()].map(([hour, count]) => ({ hour, label: String(hour).padStart(2, "0") + ":00", count })).sort((a, b) => b.count - a.count);
@@ -408,27 +433,24 @@ export async function getReportDashboard(filters: ReportFilters) {
     generatedAt: now.toISOString(),
     rowLimits: { ordersTruncated: hasMoreOrders, purchasesTruncated: hasMorePurchases },
     overview: {
-      totalOrders: orders.length,
-      nonCancelledOrders: nonCancelledCount,
-      orderValue,
-      averageOrderValue: nonCancelledCount ? orderValue / nonCancelledCount : 0,
-      cancelledOrders: cancelledCount,
-      cancelledValue,
-      deliveryCharges,
+      totalOrders: totalOrderCount,
+      nonCancelledOrders: exactNonCancelledCount,
+      orderValue: exactOrderValue,
+      averageOrderValue: exactNonCancelledCount ? exactOrderValue / exactNonCancelledCount : 0,
+      cancelledOrders: exactCancelledCount,
+      cancelledValue: exactCancelledValue,
+      deliveryCharges: orders.length === totalOrderCount ? deliveryCharges : exactDeliveryCharges,
       purchaseSpend,
       activePurchaseTransactions: activePurchaseCount,
       voidedPurchaseTransactions: voidedPurchaseCount,
-      averageAcceptanceSeconds: average(acceptanceDurations),
-      averagePreparationSeconds: average(preparationDurations),
+      averageAcceptanceSeconds: orderTimingAggregates._avg.acceptanceDurationSeconds,
+      averagePreparationSeconds: orderTimingAggregates._avg.preparationDurationSeconds,
       averageReadyToHandoverSeconds: average(handoverDurations),
     },
     sales: {
       trend, channelMix, areaMix, peakHours: peakHours.slice(0, 8),
       statusCounts, totalOrders: orders.length,
-      cancellationByChannel: channelMix.map((item) => ({
-        channel: item.channel,
-        cancelled: orders.filter((order) => order.channel === item.channel && order.status === "CANCELLED").length,
-      })),
+      cancellationByChannel: channelMix.map((item) => ({ channel: item.channel, cancelled: item.cancelled })),
       orders: orders.map((order) => ({
         id: order.id, invoiceNumber: order.invoiceNumber, kotNumber: order.kotNumber,
         channel: order.channel, status: order.status, total: money(order.total),
