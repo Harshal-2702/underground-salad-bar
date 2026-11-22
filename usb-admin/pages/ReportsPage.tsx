@@ -10,7 +10,7 @@ type AnyRecord = Record<string, any>;
 type ReportDashboard = {
   filters: { from: string; to: string; channel: ReportChannel };
   generatedAt: string;
-  rowLimits: { ordersTruncated: boolean; purchasesTruncated: boolean; orderDetailsSampled?: boolean; purchaseDetailsSampled?: boolean };
+  rowLimits: { ordersTruncated: boolean; purchasesTruncated: boolean; purchaseLinesTruncated?: boolean };
   overview: AnyRecord;
   sales: AnyRecord;
   kitchen: AnyRecord;
@@ -356,7 +356,8 @@ function buildReportSheets(report: ReportDashboard): WorkbookSheet[] {
     ["Profit / COGS", "Not calculated; order bowls are not linked to immutable recipe versions and actual ingredient issues."],
     ["Inventory changes", "Compares two stocktake snapshots; not a consumption or wastage calculation."],
     ["Order high-volume safeguard", report.rowLimits.ordersTruncated ? "Order trend, hour and area breakdowns, SLA details and registers use the latest 5,000 order detail rows. Headline order totals, statuses and channel aggregates use full database counts/aggregates." : "No order detail row cap reached for this period."],
-    ["Purchase high-volume safeguard", report.rowLimits.purchasesTruncated ? "Purchase spend/category/supplier/ingredient breakdowns and line detail use the latest 5,000 purchase transactions in this period." : "No purchase transaction row cap reached for this period."],
+    ["Purchase high-volume safeguard", report.rowLimits.purchasesTruncated ? "Purchase spend/category/supplier/ingredient breakdowns use the latest 5,000 purchase transactions in this period." : "No purchase transaction row cap reached for this period."],
+    ["Purchase line high-volume safeguard", report.rowLimits.purchaseLinesTruncated ? "Purchase line details are capped at the first 5,000 lines from the selected transaction sample." : "No purchase line row cap reached for this period."],
     ["Time zone", "Asia/Kolkata (IST)."],
     ["Currency", "INR."],
   ] });
@@ -586,9 +587,11 @@ export default function ReportsPage({
     {!loading && !report && <div className="reports-empty"><strong>No report data could be loaded.</strong><p>Check the connection and refresh the report.</p></div>}
 
     {report && <>
-      { (report.rowLimits.ordersTruncated || report.rowLimits.purchasesTruncated) &&
+      { (report.rowLimits.ordersTruncated || report.rowLimits.purchasesTruncated || report.rowLimits.purchaseLinesTruncated) &&
         <div className="reports-alert reports-alert-warning">
-          A high-volume safeguard limited some detail rows to the first 5,000 records. The dashboard and Excel export will clearly reflect the returned detail sample; use shorter date ranges for complete detail exports.
+          {report.rowLimits.ordersTruncated && <p>Order headline totals, channel and status totals use full-period database aggregates. Daily trends, busiest hours/days, areas, kitchen SLA distributions, timing breakdowns and order detail use the latest 5,000 order records.</p>}
+          {report.rowLimits.purchasesTruncated && <p>Purchase summaries and transaction detail use the latest 5,000 purchase transactions with selected-period sheets.</p>}
+          {report.rowLimits.purchaseLinesTruncated && <p>Purchase line-level detail is capped at 5,000 lines. Shorten the date range for a complete line export.</p>}
         </div>
       }
 
