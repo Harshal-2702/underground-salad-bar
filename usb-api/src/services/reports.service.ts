@@ -156,7 +156,7 @@ export async function getReportDashboard(filters: ReportFilters) {
     }),
     prisma.kotChannelTimingSetting.findMany(),
     prisma.order.count({ where: orderWhere }),
-    prisma.order.groupBy({ by: ["status"], where: orderWhere, _count: { _all: true }, _sum: { total: true } }),
+    prisma.order.groupBy({ by: ["status"], where: orderWhere, _count: { _all: true }, _sum: { total: true, deliveryCharge: true } }),
     prisma.order.groupBy({ by: ["channel", "status"], where: orderWhere, _count: { _all: true }, _sum: { total: true } }),
     prisma.order.aggregate({
       where: { ...orderWhere, status: { not: "CANCELLED" } },
@@ -199,7 +199,7 @@ export async function getReportDashboard(filters: ReportFilters) {
   const exactNonCancelledGroups = orderStatusAggregates.filter((group) => group.status !== "CANCELLED");
   const exactNonCancelledCount = exactNonCancelledGroups.reduce((sum, group) => sum + group._count._all, 0);
   const exactOrderValue = exactNonCancelledGroups.reduce((sum, group) => sum + money(group._sum.total), 0);
-  const exactDeliveryCharges = 0;
+  const exactDeliveryCharges = exactNonCancelledGroups.reduce((sum, group) => sum + money(group._sum.deliveryCharge), 0);
   for (const order of orders) {
     // Aggregate status totals are loaded separately without the detail-row cap.
     const isCancelled = order.status === "CANCELLED";
@@ -439,7 +439,7 @@ export async function getReportDashboard(filters: ReportFilters) {
       averageOrderValue: exactNonCancelledCount ? exactOrderValue / exactNonCancelledCount : 0,
       cancelledOrders: exactCancelledCount,
       cancelledValue: exactCancelledValue,
-      deliveryCharges: orders.length === totalOrderCount ? deliveryCharges : exactDeliveryCharges,
+      deliveryCharges: exactDeliveryCharges,
       purchaseSpend,
       activePurchaseTransactions: activePurchaseCount,
       voidedPurchaseTransactions: voidedPurchaseCount,
@@ -449,7 +449,7 @@ export async function getReportDashboard(filters: ReportFilters) {
     },
     sales: {
       trend, channelMix, areaMix, peakHours: peakHours.slice(0, 8),
-      statusCounts, totalOrders: orders.length,
+      statusCounts, totalOrders: totalOrderCount,
       cancellationByChannel: channelMix.map((item) => ({ channel: item.channel, cancelled: item.cancelled })),
       orders: orders.map((order) => ({
         id: order.id, invoiceNumber: order.invoiceNumber, kotNumber: order.kotNumber,
