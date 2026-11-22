@@ -995,14 +995,14 @@ export default function PurchasesPage({ accessToken, signedInEmail, onBackToOrde
                 <tr><td colSpan={8} className="purchase-empty-cell">No purchase transactions found.</td></tr>
               ) : historyData.items.map((item) => (
                 <tr key={item.id}>
-                  <td><strong>{item.reference}</strong><small>{new Date(item.createdAt).toLocaleString("en-IN")}</small></td>
-                  <td>{item.sheets.map((sheet) => dateLabel(sheet.purchaseDate)).join(", ")}</td>
-                  <td>{item.sheets.map((sheet) => sheet.inventoryCategoryNameSnapshot).join(", ")}</td>
-                  <td>{item.sheets.map((sheet) => sheet.supplierName).join(", ")}</td>
-                  <td className="purchase-amount-cell">{formatAmount(item.totalAmount)}</td>
-                  <td><strong>{item.recordedByName}</strong><small>{item.recordedByEmail}</small></td>
-                  <td><span className={`purchase-status ${item.voidedAt ? "is-voided" : "is-posted"}`}>{item.voidedAt ? "Voided" : "Posted"}</span></td>
-                  <td><button type="button" className="purchase-text-button" onClick={() => void openDetail(item.id)}>View</button></td>
+                  <td data-label="Reference"><strong>{item.reference}</strong><small>{new Date(item.createdAt).toLocaleString("en-IN")}</small></td>
+                  <td data-label="Purchase date(s)">{item.sheets.map((sheet) => dateLabel(sheet.purchaseDate)).join(", ")}</td>
+                  <td data-label="Category sheet(s)">{item.sheets.map((sheet) => sheet.inventoryCategoryNameSnapshot).join(", ")}</td>
+                  <td data-label="Supplier(s)">{item.sheets.map((sheet) => sheet.supplierName).join(", ")}</td>
+                  <td data-label="Total amount" className="purchase-amount-cell">{formatAmount(item.totalAmount)}</td>
+                  <td data-label="Recorded by"><strong>{item.recordedByName}</strong><small>{item.recordedByEmail}</small></td>
+                  <td data-label="Status"><span className={`purchase-status ${item.voidedAt ? "is-voided" : "is-posted"}`}>{item.voidedAt ? "Voided" : "Posted"}</span></td>
+                  <td data-label="Actions"><button type="button" className="purchase-text-button" onClick={() => void openDetail(item.id)}>View</button></td>
                 </tr>
               ))}
             </tbody>
