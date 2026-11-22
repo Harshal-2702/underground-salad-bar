@@ -4,9 +4,7 @@ const hostname =
 // Vercel's VITE_VERCEL_ENV identifies the deployment target at build time.
 // A production deployment can be opened on a unique *.vercel.app hostname,
 // so the hostname alone must never be used to classify Preview vs Production.
-const deploymentEnvironment = (
-  import.meta.env.VITE_VERCEL_ENV ?? ""
-).trim().toLowerCase();
+const deploymentEnvironment = __USB_DEPLOYMENT_ENV__.trim().toLowerCase();
 
 const isVercelPreview = deploymentEnvironment === "preview";
 const isVercelProduction = deploymentEnvironment === "production";
