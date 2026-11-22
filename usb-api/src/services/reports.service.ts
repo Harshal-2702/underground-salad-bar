@@ -109,11 +109,7 @@ export async function getReportDashboard(filters: ReportFilters) {
         acceptedAt: true, readyAt: true, handedOverAt: true, cancelledAt: true,
         acceptanceDurationSeconds: true, preparationDurationSeconds: true,
         deliveryArea: true, deliveryCity: true,
-        bowls: { select: { bowlName: true, quantity: true, price: true, details: true } },
-        statusEvents: {
-          orderBy: { createdAt: "asc" },
-          select: { fromStatus: true, toStatus: true, createdAt: true },
-        },
+        bowls: { select: { quantity: true } },
       },
     }),
     prisma.purchaseTransaction.findMany({
@@ -173,7 +169,6 @@ export async function getReportDashboard(filters: ReportFilters) {
 
   const statusCounts: Record<string, number> = {};
   for (const status of Object.values(OrderStatus)) statusCounts[status] = 0;
-  const channelMap = new Map<string, { label: string; count: number; amount: number }>();
   const areaMap = new Map<string, { label: string; count: number; amount: number }>();
   const trendMap = new Map<string, { date: string; orders: number; orderValue: number; cancelled: number }>();
   const hourMap = new Map<number, number>();
@@ -184,12 +179,6 @@ export async function getReportDashboard(filters: ReportFilters) {
   const acceptanceSla = { within: 0, amber: 0, late: 0, unconfigured: 0 };
   const preparationSla = { within: 0, amber: 0, late: 0, unconfigured: 0 };
   const activeLateOrders: Array<Record<string, unknown>> = [];
-  let orderValue = 0;
-  let cancelledValue = 0;
-  let deliveryCharges = 0;
-  let nonCancelledCount = 0;
-  let cancelledCount = 0;
-
   const settingsByChannel = new Map(timingSettings.map((setting) => [setting.channel, setting]));
   for (const status of Object.values(OrderStatus)) statusCounts[status] = 0;
   for (const group of orderStatusAggregates) statusCounts[group.status] = group._count._all;
@@ -208,19 +197,12 @@ export async function getReportDashboard(filters: ReportFilters) {
     const trend = trendMap.get(dayKey) ?? { date: dayKey, orders: 0, orderValue: 0, cancelled: 0 };
     trend.orders += 1;
     if (isCancelled) {
-      cancelledCount += 1;
-      cancelledValue += total;
       trend.cancelled += 1;
     } else {
-      nonCancelledCount += 1;
-      orderValue += total;
-      deliveryCharges += money(order.deliveryCharge);
       trend.orderValue += total;
     }
     trendMap.set(dayKey, trend);
 
-    const channelLabel = order.channel === "WEBSITE" ? "Website" : order.channel === "ZOMATO" ? "Zomato" : "Swiggy";
-    addGroup(channelMap, order.channel, channelLabel, isCancelled ? 0 : total);
     if (order.deliveryArea?.trim()) addGroup(areaMap, order.deliveryArea.trim().toLowerCase(), order.deliveryArea.trim(), isCancelled ? 0 : total);
     const hour = indiaHour(order.createdAt);
     hourMap.set(hour, (hourMap.get(hour) ?? 0) + 1);
