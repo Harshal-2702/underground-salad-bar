@@ -384,10 +384,10 @@ function Panel({ id, title, subtitle, children }: { id?: string; title: string; 
   </section>;
 }
 
-function BarList({ items, valueKey = "amount", format = "money" }: { items: AnyRecord[]; valueKey?: string; format?: "money" | "number" }) {
+function BarList({ items, valueKey = "amount", format = "money", maxItems = 8 }: { items: AnyRecord[]; valueKey?: string; format?: "money" | "number"; maxItems?: number }) {
   const max = Math.max(1, ...items.map((item) => Number(item[valueKey] ?? 0)));
   if (!items.length) return <p className="reports-empty-inline">No records in this period.</p>;
-  return <div className="reports-bar-list">{items.slice(0, 8).map((item, index) => {
+  return <div className="reports-bar-list">{items.slice(0, maxItems).map((item, index) => {
     const value = Number(item[valueKey] ?? 0);
     return <div className="reports-bar-row" key={String(item.label ?? item.hour ?? index)}>
       <div><span>{String(item.label ?? item.hour ?? "—")}</span><strong>{format === "money" ? formatMoney(value) : formatNumber(value)}</strong></div>
@@ -705,7 +705,7 @@ export default function ReportsPage({
           <MetricCard label="Voided purchase records" value={formatNumber(report.purchases.voidedTransactionCount)} note="Excluded from spend"/>
         </div>
         <div className="reports-two-columns">
-          <Panel title="Purchase spend trend" subtitle="Non-voided line amounts by purchase date."><BarList items={report.purchases.trend ?? []}/></Panel>
+          <Panel title="Purchase spend trend" subtitle="Non-voided line amounts by purchase date."><BarList items={report.purchases.trend ?? []} maxItems={31}/></Panel>
           <Panel title="Spend by category" subtitle="Recorded, non-voided purchase lines."><BarList items={purchaseByCategory}/></Panel>
         </div>
         <div className="reports-two-columns reports-panel-gap">
