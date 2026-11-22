@@ -224,23 +224,23 @@ export async function getReportDashboard(filters: ReportFilters) {
     if (!isCancelled && order.readyAt && order.handedOverAt) channelTiming.handover.push(Math.max(0, Math.floor((order.handedOverAt.getTime() - order.readyAt.getTime()) / 1000)));
     channelOperations.set(order.channel, channelTiming);
 
-    if (order.acceptanceDurationSeconds != null) {
+    if (!isCancelled && order.acceptanceDurationSeconds != null) {
       acceptanceDurations.push(order.acceptanceDurationSeconds);
       const state = classifySla(order.acceptanceDurationSeconds, setting?.acceptanceAmberMinutes, setting?.acceptanceLateMinutes);
       acceptanceSla[state === "WITHIN" ? "within" : state === "AMBER" ? "amber" : state === "LATE" ? "late" : "unconfigured"] += 1;
-    } else if (order.status !== "PENDING") {
+    } else if (!isCancelled && order.status !== "PENDING") {
       acceptanceSla.unconfigured += 1;
     }
 
-    if (order.preparationDurationSeconds != null) {
+    if (!isCancelled && order.preparationDurationSeconds != null) {
       preparationDurations.push(order.preparationDurationSeconds);
       const state = classifySla(order.preparationDurationSeconds, setting?.preparationAmberMinutes, setting?.preparationLateMinutes);
       preparationSla[state === "WITHIN" ? "within" : state === "AMBER" ? "amber" : state === "LATE" ? "late" : "unconfigured"] += 1;
-    } else if (order.readyAt || order.status === "CANCELLED") {
+    } else if (!isCancelled && order.readyAt) {
       preparationSla.unconfigured += 1;
     }
 
-    if (order.readyAt && order.handedOverAt) {
+    if (!isCancelled && order.readyAt && order.handedOverAt) {
       handoverDurations.push(Math.max(0, Math.floor((order.handedOverAt.getTime() - order.readyAt.getTime()) / 1000)));
     }
 
@@ -311,7 +311,7 @@ export async function getReportDashboard(filters: ReportFilters) {
   const peakHours = [...hourMap.entries()].map(([hour, count]) => ({ hour, label: String(hour).padStart(2, "0") + ":00", count })).sort((a, b) => b.count - a.count);
   const busiestDays = [...weekdayMap.values()].sort((a, b) => b.count - a.count);
   const longestPreparation = orders
-    .filter((order) => order.preparationDurationSeconds != null)
+    .filter((order) => order.status !== "CANCELLED" && order.preparationDurationSeconds != null)
     .sort((a, b) => (b.preparationDurationSeconds ?? 0) - (a.preparationDurationSeconds ?? 0))
     .slice(0, 12)
     .map((order) => ({
@@ -347,10 +347,10 @@ export async function getReportDashboard(filters: ReportFilters) {
         const amount = money(line.itemAmount);
         const unit = line.purchaseUnitSymbolSnapshot;
         const ingredientKey = line.ingredientCodeSnapshot + "|" + unit;
-        const ingredientGroup = purchaseIngredientMap.get(ingredientKey) ?? {
-          label: line.ingredientNameSnapshot, unit, quantity: 0, amount: 0, unitPrice: 0,
-        };
         if (!transaction.voidedAt) {
+          const ingredientGroup = purchaseIngredientMap.get(ingredientKey) ?? {
+            label: line.ingredientNameSnapshot, unit, quantity: 0, amount: 0, unitPrice: 0,
+          };
           ingredientGroup.quantity += quantity;
           ingredientGroup.amount += amount;
           purchaseSpend += amount;
@@ -360,9 +360,9 @@ export async function getReportDashboard(filters: ReportFilters) {
           purchaseTrendMap.set(purchaseDate, purchaseTrend);
           addGroup(purchaseCategoryMap, sheet.inventoryCategoryNameSnapshot, sheet.inventoryCategoryNameSnapshot, amount);
           addGroup(purchaseSupplierMap, sheet.supplierName.toLowerCase(), sheet.supplierName, amount);
+          ingredientGroup.unitPrice = ingredientGroup.quantity > 0 ? ingredientGroup.amount / ingredientGroup.quantity : 0;
+          purchaseIngredientMap.set(ingredientKey, ingredientGroup);
         }
-        ingredientGroup.unitPrice = ingredientGroup.quantity > 0 ? ingredientGroup.amount / ingredientGroup.quantity : 0;
-        purchaseIngredientMap.set(ingredientKey, ingredientGroup);
         purchaseLines.push({
           reference: transaction.reference, purchaseDate, supplier: sheet.supplierName,
           invoiceNumber: sheet.invoiceNumber, category: sheet.inventoryCategoryNameSnapshot,
@@ -427,7 +427,11 @@ export async function getReportDashboard(filters: ReportFilters) {
   return {
     filters,
     generatedAt: now.toISOString(),
-    rowLimits: { ordersTruncated: hasMoreOrders, purchasesTruncated: hasMorePurchases },
+    rowLimits: {
+      ordersTruncated: hasMoreOrders,
+      purchasesTruncated: hasMorePurchases,
+      purchaseLinesTruncated: purchaseLines.length > 5000,
+    },
     overview: {
       totalOrders: totalOrderCount,
       nonCancelledOrders: exactNonCancelledCount,
