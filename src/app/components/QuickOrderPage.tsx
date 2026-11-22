@@ -128,19 +128,19 @@ export function QuickOrderPage() {
   const updateForm = (key: keyof CustomerForm, value: string) => {
     setForm((current) => ({ ...current, [key]: value }));
     setErrors((current) => ({ ...current, [key]: "" }));
+    setFormError("");
   };
 
   const changeIngredient = (category: string, itemName: string, direction: 1 | -1) => {
     if (category === "veggies") {
-      setSelectedVeggies((current) => {
-        const exists = current.includes(itemName);
-        const next = direction === 1
-          ? (exists ? current : [...current, itemName])
-          : current.filter((item) => item !== itemName);
-        if (next.length > 0 && veggieScoops === 0) setVeggieScoops(1);
-        if (next.length === 0) setVeggieScoops(0);
-        return next;
-      });
+      const exists = selectedVeggies.includes(itemName);
+      const next = direction === 1
+        ? (exists ? selectedVeggies : [...selectedVeggies, itemName])
+        : selectedVeggies.filter((item) => item !== itemName);
+      setSelectedVeggies(next);
+      if (next.length > 0 && veggieScoops === 0) setVeggieScoops(1);
+      if (next.length === 0) setVeggieScoops(0);
+      setFormError("");
       return;
     }
 
@@ -166,10 +166,7 @@ export function QuickOrderPage() {
           }
           return current.map((item) => item.category === "beans" ? { ...item, scoops: item.scoops + 0.5 } : item);
         }
-        if (selectedBeans.length >= 2) {
-          setFormError("A bowl can include up to two bean varieties.");
-          return current;
-        }
+        if (selectedBeans.length >= 2) return current;
         const rate = categories.find((item) => item.id === "beans")?.pricePerScoop ?? 30;
         if (selectedBeans.length === 1) {
           return current.map((item) => item.category === "beans"
@@ -441,7 +438,14 @@ export function QuickOrderPage() {
         </div>
         {formError && <p className="qo-form-error" role="alert">{formError}</p>}
         {bowls.length > 0 && <div className="qo-saved-bowls">
-          <div className="qo-saved-heading"><div><span>YOUR ORDER SO FAR</span><h3>{bowls.length} bowl{bowls.length !== 1 ? "s" : ""} in the making</h3></div><button type="button" className="qo-add-another" onClick={clearDraft}><Plus size={15}/> Start another bowl</button></div>
+          <div className="qo-saved-heading"><div><span>YOUR ORDER SO FAR</span><h3>{bowls.length} bowl{bowls.length !== 1 ? "s" : ""} in the making</h3></div><button type="button" className="qo-add-another" onClick={() => {
+            if (draftBowlItems.length > 0 || editingBowlId) {
+              setFormError("Save your current bowl or cancel the edit before starting another.");
+              return;
+            }
+            clearDraft();
+            document.getElementById("qo-menu")?.scrollIntoView({ behavior: "smooth", block: "start" });
+          }}><Plus size={15}/> Add another bowl</button></div>
           <div className="qo-bowl-list">
             {bowls.map((bowl, index) => <article className="qo-bowl-card" key={bowl.id}>
               <div className="qo-bowl-card-top"><div><span>🥣 BOWL {index + 1}</span><strong>{formatMoney(bowl.total)}</strong></div><div><button type="button" onClick={() => editBowl(bowl)}>Edit</button><button type="button" aria-label={"Remove bowl " + (index + 1)} onClick={() => setBowls((current) => current.filter((item) => item.id !== bowl.id))}><Trash2 size={15}/></button></div></div>
@@ -473,7 +477,6 @@ export function QuickOrderPage() {
         </div>
       </section>
 
-      <div className="qo-submit-error" aria-live="polite">{formError}</div>
       <footer className="qo-footer">
         <div><strong>UNDERGROUND SALAD BAR</strong><span>Fresh bowls. Pune roots. Good energy.</span></div>
         <span>Made with 🥬 in Pune</span>
