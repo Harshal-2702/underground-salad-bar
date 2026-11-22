@@ -281,8 +281,12 @@ function buildReportSheets(report: ReportDashboard): WorkbookSheet[] {
     ...(report.sales.trend ?? []).map((row: AnyRecord) => [row.date, row.orders, row.orderValue, row.cancelled]),
   ] });
   sheets.push({ name: "Channel Mix", rows: [
-    ["Channel", "Orders (incl. cancelled)", "Non-cancelled order value (INR)", "Cancelled orders"],
-    ...(report.sales.channelMix ?? []).map((row: AnyRecord) => [row.label, row.count, row.orderValue, row.cancelled]),
+    ["Channel", "Orders (incl. cancelled)", "Non-cancelled orders", "Non-cancelled order value (INR)", "Average order value (INR)", "Cancelled orders"],
+    ...(report.sales.channelMix ?? []).map((row: AnyRecord) => [row.label, row.count, row.nonCancelledCount, row.orderValue, row.averageOrderValue, row.cancelled]),
+  ] });
+  sheets.push({ name: "Day of Week", rows: [
+    ["Day", "Orders", "Non-cancelled order value (INR)"],
+    ...(report.sales.busiestDays ?? []).map((row: AnyRecord) => [row.label, row.count, row.orderValue]),
   ] });
   sheets.push({ name: "Order Status", rows: [
     ["Current status", "Orders"],
@@ -592,7 +596,7 @@ export default function ReportsPage({
         <div className="reports-section-title"><span>01</span><div><h2>Business overview</h2><p>The headline numbers for the selected period.</p></div></div>
         <div className="reports-metric-grid">
           <MetricCard label="Total orders" value={formatNumber(totals.totalOrders)} note={compareMetrics?.orders ?? "Includes cancelled orders"}/>
-          <MetricCard label="Order value" value={formatMoney(totals.orderValue)} note={compareMetrics?.orderValue ?? "Non-cancelled recorded orders"}/>
+          <MetricCard label="Order value" value={formatMoney(totals.orderValue)} note={compareMetrics?.orderValue ?? "Non-cancelled; includes delivery charges"}/>
           <MetricCard label="Average order value" value={formatMoney(totals.averageOrderValue)} note="Per non-cancelled order"/>
           <MetricCard label="Cancelled orders" value={formatNumber(totals.cancelledOrders)} note={formatMoney(totals.cancelledValue) + " cancelled order value"} tone="reports-metric-warm"/>
           <MetricCard label="Purchase spend" value={formatMoney(totals.purchaseSpend)} note={compareMetrics?.purchaseSpend ?? "Non-voided purchase lines"}/>
@@ -604,7 +608,7 @@ export default function ReportsPage({
           <Panel title="Order trend" subtitle="Daily order volume during the selected period."><TrendChart items={orderTrend}/></Panel>
           <Panel title="Order channels" subtitle="Order counts include cancellations; value excludes cancelled orders.">
             <div className="reports-channel-cards">{(report.sales.channelMix ?? []).map((item: AnyRecord) =>
-              <div className="reports-channel-card" key={item.channel}><span>{item.label}</span><strong>{formatNumber(item.count)}</strong><small>{formatMoney(item.orderValue)} order value</small></div>
+              <div className="reports-channel-card" key={item.channel}><span>{item.label}</span><strong>{formatNumber(item.count)}</strong><small>{formatMoney(item.orderValue)} · AOV {formatMoney(item.averageOrderValue)}</small></div>
             )}</div>
             <div className="reports-inline-stat"><span>Ready to handover average</span><strong>{formatDuration(totals.averageReadyToHandoverSeconds)}</strong></div>
           </Panel>
@@ -698,8 +702,15 @@ export default function ReportsPage({
           <MetricCard label="Voided purchase records" value={formatNumber(report.purchases.voidedTransactionCount)} note="Excluded from spend"/>
         </div>
         <div className="reports-two-columns">
+          <Panel title="Purchase spend trend" subtitle="Non-voided line amounts by purchase date."><BarList items={report.purchases.trend ?? []}/></Panel>
           <Panel title="Spend by category" subtitle="Recorded, non-voided purchase lines."><BarList items={purchaseByCategory}/></Panel>
+        </div>
+        <div className="reports-two-columns reports-panel-gap">
           <Panel title="Spend by supplier" subtitle="Supplier names as entered on purchase sheets."><BarList items={purchaseBySupplier}/></Panel>
+          <Panel title="Purchase record counts" subtitle="Purchases with at least one sheet inside the selected date range.">
+            <div className="reports-status-grid"><div><span>Active transactions</span><strong>{formatNumber(report.purchases.transactionCount)}</strong></div><div><span>Voided transactions</span><strong>{formatNumber(report.purchases.voidedTransactionCount)}</strong></div></div>
+            <p className="reports-footnote">This is recorded ingredient purchasing, not a complete operating-expense statement. Other expense types are not yet captured in the system.</p>
+          </Panel>
         </div>
         <Panel title="Ingredient price history" subtitle="Weighted average per purchase unit for this period; units are kept separate.">
           <div className="reports-desktop-table"><div className="reports-table-scroll"><table><thead><tr><th>Ingredient</th><th>Purchase unit</th><th>Quantity</th><th>Spend</th><th>Average unit price</th></tr></thead><tbody>
