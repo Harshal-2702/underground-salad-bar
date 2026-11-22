@@ -74,6 +74,8 @@ const categories = [
   { id: 'dressing', name: 'Dressing', subtitle: 'The magic touch',         pricePerScoop: 50,  items: ['Makhni', 'Spinach', 'Hung Curd Garlic', 'Pesto', 'Paprika', 'Chipotle'], note: null },
 ];
 
+export const BOWL_CATEGORIES = categories;
+
 // Visual bowl preview
 function RealisticBowlPreview({ selectedItems, selectedVeggies, veggieScoops }: {
   selectedItems: BowlItem[];
