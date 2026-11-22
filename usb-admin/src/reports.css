@@ -245,7 +245,7 @@
 .reports-inline-error { border: 1px solid #f0d1ce; background: #fff2f1; color: #9f3830; }
 .reports-inline-success { border: 1px solid #d4e7d3; background: #f0f8ef; color: #32633a; }
 .reports-alert { margin-bottom: 14px; padding: 11px 13px; border-radius: 9px; font-size: 10px; line-height: 1.5; }
-.reports-alert-error { border: 1px solid #efcecb; background: #fff1f0; color: #9b3029; }
+.reports-alert-error { border: 1px solid #efcecb; background: #fff1f0; color: #9b3029; }\n.reports-alert p { margin: 0 0 6px; }\n.reports-alert p:last-child { margin-bottom: 0; }
 .reports-alert-warning { border: 1px solid #eee0c7; background: #fff9ec; color: #876035; }
 .reports-loading, .reports-empty { display: grid; justify-items: center; gap: 7px; padding: 54px 18px; border: 1px solid #e2e9e0; border-radius: 13px; background: #fff; text-align: center; }
 .reports-loading strong, .reports-empty strong { color: #2b4833; font-size: 13px; }
@@ -262,7 +262,7 @@
   .reports-date-field .reports-input { width: 100%; }
 }
 @media (max-width: 760px) {
-  .reports-shell { padding: max(16px,env(safe-area-inset-top)) 13px calc(32px + env(safe-area-inset-bottom)); }
+  .reports-shell { padding: max(16px,env(safe-area-inset-top)) 13px calc(32px + env(safe-area-inset-bottom)); }\n  .reports-input { min-height: 44px; font-size: 16px; }\n  .reports-button { min-height: 44px; }\n  .reports-email-selection label { min-height: 44px; }
   .reports-header { flex-direction: column; gap: 14px; margin-bottom: 18px; }
   .reports-header-actions { justify-content: stretch; width: 100%; }
   .reports-header-actions .reports-button { flex: 1 1 auto; }
