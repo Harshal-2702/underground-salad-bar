@@ -191,3 +191,59 @@ body {
 .auth-submit:disabled { opacity: 0.65; cursor: wait; }
 .auth-error { margin: 4px 0; color: #a32626; font-size: 13px; }
 .auth-footnote { margin: 22px 0 0; color: #778078; font-size: 12px; line-height: 1.5; }
+
+
+/* Small-screen foundations shared by all Kitchen OS Admin modules. */
+html {
+  min-width: 320px;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  min-width: 320px;
+  overflow-x: hidden;
+}
+
+button {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+@media (max-width: 760px) {
+  main input:not([type="checkbox"]):not([type="radio"]),
+  main select,
+  main textarea {
+    font-size: 16px !important;
+  }
+
+  .kot-button,
+  .kot-icon-button,
+  .catalogue-button,
+  .catalogue-text-button,
+  .purchase-button,
+  .purchase-text-button,
+  .recipe-button,
+  .recipe-icon-button,
+  .auth-submit,
+  .auth-secondary {
+    min-height: 44px;
+  }
+
+  .kot-shell,
+  .catalogue-shell,
+  .purchase-shell,
+  .recipes-shell {
+    padding-bottom: calc(32px + env(safe-area-inset-bottom));
+  }
+
+  .auth-card {
+    padding: 26px 20px;
+  }
+
+  .auth-shell {
+    min-height: 100svh;
+    padding-top: max(16px, env(safe-area-inset-top));
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+  }
+}
