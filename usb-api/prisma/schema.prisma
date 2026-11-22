@@ -569,3 +569,18 @@ model LeftoverInventoryLine {
   @@index([ingredientId])
   @@index([baseUnitId])
 }
+
+
+model ReportEmailPreference {
+  id             String   @id @default("default") @db.VarChar(40)
+  recipientEmail String   @db.VarChar(255)
+  deliveryTime   String   @db.VarChar(5)
+  selectedReports Json    @db.JsonB
+  timeZone       String   @default("Asia/Kolkata") @db.VarChar(64)
+  isEnabled      Boolean  @default(false)
+  updatedByEmail String?  @db.VarChar(255)
+  createdAt      DateTime @default(now()) @db.Timestamp(3)
+  updatedAt      DateTime @updatedAt @db.Timestamp(3)
+
+  @@index([isEnabled, deliveryTime])
+}
