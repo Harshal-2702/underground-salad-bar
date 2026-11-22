@@ -8,6 +8,7 @@ import { BowlBuilder, Bowl } from "./components/BowlBuilder";
 import { Cart } from "./components/Cart";
 import { WhatsAppButton } from "./components/WhatsAppButton";
 import { ShoppingCart } from "lucide-react";
+import { QuickOrderPage } from "./components/QuickOrderPage";
 
 type Page = "home" | "about";
 
@@ -26,7 +27,7 @@ function useBodyScrollLock(locked: boolean) {
   }, [locked]);
 }
 
-export default function App() {
+function MainWebsite() {
   const [currentPage, setCurrentPage] = useState<Page>("home");
   const [isBowlBuilderOpen, setIsBowlBuilderOpen] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -198,4 +199,10 @@ const [subscriptions, setSubscriptions] = useState<SubscriptionPlan[]>([]);
       </AnimatePresence>
     </div>
   );
+}
+
+
+export default function App() {
+  const path = typeof window === "undefined" ? "/" : window.location.pathname.replace(/\\/+$/, "") || "/";
+  return path === "/quick-order" ? <QuickOrderPage /> : <MainWebsite />;
 }
