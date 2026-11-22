@@ -963,9 +963,25 @@ export default function OrdersPage({
     }
   };
 
-  const printKotAutomatically = (order: OrderRecord, sample = false) => {
-    if (!sample && !autoPrintEnabled) return;
+  const recordAutoPrintSuccess = (order: OrderRecord) => {
+    autoPrintingKotIdsRef.current.delete(order.id);
+    autoPrintedKotIdsRef.current.add(order.id);
+    const savedIds = [...autoPrintedKotIdsRef.current].slice(-500);
+    try {
+      window.localStorage.setItem("ukos.kot.autoPrintedIds.v1", JSON.stringify(savedIds));
+      setAutoPrintNotice(`Customer receipt and kitchen ticket for ${order.kotNumber} sent to the Windows default printer.`);
+    } catch {
+      setAutoPrintNotice(`Both copies for ${order.kotNumber} were sent, but this browser could not persist duplicate-print history. Keep this tab open for the current session.`);
+    }
+  };
+
+  const printKotAutomatically = (order: OrderRecord, sample = false, reservedWindow?: Window | null) => {
+    if (!sample && !autoPrintEnabled) {
+      reservedWindow?.close();
+      return;
+    }
     if (!sample && (autoPrintedKotIdsRef.current.has(order.id) || autoPrintingKotIdsRef.current.has(order.id))) {
+      reservedWindow?.close();
       return;
     }
 
@@ -973,6 +989,48 @@ export default function OrdersPage({
     setPrintError("");
     setAutoPrintNotice("");
     setPrintingOrderId(order.id);
+
+    // Reserve a print window synchronously during the Accept click. The order
+    // details are written only after the API confirms that acceptance succeeded.
+    // This avoids relying on an asynchronous hidden-iframe print call that may
+    // be restricted by the browser's user-gesture policy.
+    if (reservedWindow) {
+      try {
+        reservedWindow.document.open();
+        reservedWindow.document.write(sample
+          ? buildKotPrintHtml(order, templateConfigs[activeTemplateType], activeTemplateType)
+          : buildBothKotPrintHtml(order, templateConfigs.CUSTOMER, templateConfigs.KITCHEN));
+        reservedWindow.document.close();
+        reservedWindow.addEventListener("afterprint", () => {
+          if (!reservedWindow.closed) reservedWindow.close();
+          setPrintingOrderId((current) => current === order.id ? null : current);
+        }, { once: true });
+
+        window.setTimeout(() => {
+          try {
+            if (reservedWindow.closed) throw new Error("The automatic KOT print window was closed before printing.");
+            reservedWindow.focus();
+            reservedWindow.print();
+            recordAutoPrintSuccess(order);
+            setPrintingOrderId(null);
+            window.setTimeout(() => {
+              if (!reservedWindow.closed) reservedWindow.close();
+            }, 10000);
+          } catch (error) {
+            autoPrintingKotIdsRef.current.delete(order.id);
+            setPrintingOrderId(null);
+            setPrintError(error instanceof Error ? error.message : "Unable to send the KOT to the Windows printer.");
+            if (!reservedWindow.closed) reservedWindow.close();
+          }
+        }, 600);
+      } catch (error) {
+        autoPrintingKotIdsRef.current.delete(order.id);
+        setPrintingOrderId(null);
+        setPrintError(error instanceof Error ? error.message : "Unable to prepare the automatic KOT print window.");
+        if (!reservedWindow.closed) reservedWindow.close();
+      }
+      return;
+    }
 
     const frame = document.createElement("iframe");
     frame.title = `KOT print job ${order.kotNumber}`;
@@ -1017,14 +1075,7 @@ export default function OrdersPage({
           frame.contentWindow.print();
 
           if (!sample) {
-            autoPrintedKotIdsRef.current.add(order.id);
-            const savedIds = [...autoPrintedKotIdsRef.current].slice(-500);
-            try {
-              window.localStorage.setItem("ukos.kot.autoPrintedIds.v1", JSON.stringify(savedIds));
-              setAutoPrintNotice(`Customer receipt and kitchen ticket for ${order.kotNumber} sent to the Windows default printer.`);
-            } catch {
-              setAutoPrintNotice(`Both copies for ${order.kotNumber} were sent, but this browser could not persist duplicate-print history. Keep this tab open for the current session.`);
-            }
+            recordAutoPrintSuccess(order);
           } else {
             setAutoPrintNotice(`Sample ${activeTemplateType === "CUSTOMER" ? "customer receipt" : "kitchen ticket"} sent to the Windows default printer.`);
           }
@@ -1048,6 +1099,12 @@ export default function OrdersPage({
   const updateStatus = async (order: OrderRecord, status: OrderStatus) => {
     const actionLabel = status === "CONFIRMED" ? "accept" : status === "OUT_FOR_DELIVERY" ? "mark handed over" : status === "CANCELLED" ? "cancel" : `move to ${statusLabel(status).toLowerCase()}`;
     if (status === "CANCELLED" && !window.confirm(`Cancel ${order.kotNumber}? This will remain in today's order history.`)) return;
+    // Reserve this popup synchronously in the staff's Accept click, before
+    // the status request yields control to the browser.
+    let pendingAutoPrintWindow: Window | null = status === "CONFIRMED" && autoPrintEnabled
+      ? window.open("", "_blank", "popup,width=420,height=720")
+      : null;
+
     setBusyOrder(true);
     setApiError("");
     setNotice("");
@@ -1072,10 +1129,16 @@ export default function OrdersPage({
       setSelectedOrder(updatedOrder);
       setNotice(`${order.kotNumber} ${status === "CONFIRMED" ? "accepted" : status === "OUT_FOR_DELIVERY" ? "handed over" : status === "CANCELLED" ? "cancelled" : `updated to ${statusLabel(status).toLowerCase()}`}.`);
       if (status === "CONFIRMED" && autoPrintEnabled) {
-        window.setTimeout(() => printKotAutomatically(updatedOrder), 250);
+        if (pendingAutoPrintWindow) {
+          printKotAutomatically(updatedOrder, false, pendingAutoPrintWindow);
+          pendingAutoPrintWindow = null;
+        } else {
+          setPrintError("Order accepted, but the browser blocked the automatic print window. Allow pop-ups for Kitchen OS, then use Print KOT for this order.");
+        }
       }
       await loadOrders(true);
     } catch (error) {
+      if (pendingAutoPrintWindow && !pendingAutoPrintWindow.closed) pendingAutoPrintWindow.close();
       setApiError(error instanceof Error ? error.message : "Unable to update this order.");
     } finally {
       setBusyOrder(false);
