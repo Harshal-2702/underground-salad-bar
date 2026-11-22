@@ -652,3 +652,30 @@
     flex-direction: column;
   }
 }
+
+/* Recipe selector: keep the list usable without trapping the whole page on phones. */
+@media (max-width: 700px) {
+  .recipes-sidebar {
+    min-width: 0;
+  }
+
+  .recipe-list {
+    max-height: min(42svh, 380px);
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .recipe-list-item,
+  .recipe-line,
+  .recipe-version-bar {
+    min-width: 0;
+  }
+
+  .recipes-account {
+    width: 100%;
+  }
+
+  .recipes-account .recipe-button {
+    min-height: 44px;
+  }
+}
