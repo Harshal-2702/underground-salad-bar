@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { API_URL } from "../src/config.ts";
-import "../usb-admin/src/reports.css";
+import "../src/reports.css";
 
 type ReportChannel = "ALL" | "WEBSITE" | "ZOMATO" | "SWIGGY";
 type DatePreset = "TODAY" | "YESTERDAY" | "LAST_7" | "LAST_30" | "THIS_MONTH" | "CUSTOM";
