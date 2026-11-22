@@ -1,10 +1,26 @@
 const hostname =
   typeof window === "undefined" ? "" : window.location.hostname.toLowerCase();
 
-const isVercelPreview = hostname.endsWith(".vercel.app");
+// Vercel's VITE_VERCEL_ENV identifies the deployment target at build time.
+// A production deployment can be opened on a unique *.vercel.app hostname,
+// so the hostname alone must never be used to classify Preview vs Production.
+const deploymentEnvironment = (
+  import.meta.env.VITE_VERCEL_ENV ?? ""
+).trim().toLowerCase();
 
-// Vercel Preview deployments must use a dedicated staging API variable.
-// They must never fall back to VITE_API_URL, which is reserved for Production/local.
+const isVercelPreview = deploymentEnvironment === "preview";
+const isVercelProduction = deploymentEnvironment === "production";
+const isVercelDeployment = isVercelPreview || isVercelProduction;
+const isVercelHostname = hostname.endsWith(".vercel.app");
+
+if (isVercelHostname && !isVercelDeployment) {
+  throw new Error(
+    "Unable to identify this Vercel deployment environment. Check that Vercel system environment variables are enabled.",
+  );
+}
+
+// Vercel Preview builds use the isolated staging API.
+// Production builds and local development use the configured primary API.
 const configuredApiUrl = (
   isVercelPreview
     ? import.meta.env.VITE_PREVIEW_API_URL
@@ -32,6 +48,10 @@ if (parsedApiUrl.protocol !== "https:" && hostname !== "localhost" && hostname !
 
 if (isVercelPreview && parsedApiUrl.hostname === "usb-api.onrender.com") {
   throw new Error("Safety stop: Vercel Preview cannot connect to the production API.");
+}
+
+if (isVercelProduction && parsedApiUrl.hostname !== "usb-api.onrender.com") {
+  throw new Error("Safety stop: Vercel Production must connect to the production API.");
 }
 
 if (
