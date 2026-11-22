@@ -523,7 +523,7 @@ export default function ReportsPage({
     }
   };
 
-  const totals = report?.overview;
+  const totals: AnyRecord = report?.overview ?? {};
   const orderTrend = report?.sales?.trend ?? [];
   const allOrderRows: AnyRecord[] = report?.sales?.orders ?? [];
   const purchaseLines: AnyRecord[] = report?.purchases?.lines ?? [];
