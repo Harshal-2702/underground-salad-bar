@@ -172,6 +172,7 @@ export async function getReportDashboard(filters: ReportFilters) {
   const acceptanceDurations: number[] = [];
   const preparationDurations: number[] = [];
   const handoverDurations: number[] = [];
+  const channelOperations = new Map<string, { acceptance: number[]; preparation: number[]; handover: number[] }>();
   const acceptanceSla = { within: 0, amber: 0, late: 0, unconfigured: 0 };
   const preparationSla = { within: 0, amber: 0, late: 0, unconfigured: 0 };
   const activeLateOrders: Array<Record<string, unknown>> = [];
@@ -208,6 +209,12 @@ export async function getReportDashboard(filters: ReportFilters) {
     hourMap.set(hour, (hourMap.get(hour) ?? 0) + 1);
 
     const setting = settingsByChannel.get(order.channel);
+    const channelTiming = channelOperations.get(order.channel) ?? { acceptance: [], preparation: [], handover: [] };
+    if (!isCancelled && order.acceptanceDurationSeconds != null) channelTiming.acceptance.push(order.acceptanceDurationSeconds);
+    if (!isCancelled && order.preparationDurationSeconds != null) channelTiming.preparation.push(order.preparationDurationSeconds);
+    if (!isCancelled && order.readyAt && order.handedOverAt) channelTiming.handover.push(Math.max(0, Math.floor((order.handedOverAt.getTime() - order.readyAt.getTime()) / 1000)));
+    channelOperations.set(order.channel, channelTiming);
+
     if (order.acceptanceDurationSeconds != null) {
       acceptanceDurations.push(order.acceptanceDurationSeconds);
       const state = classifySla(order.acceptanceDurationSeconds, setting?.acceptanceAmberMinutes, setting?.acceptanceLateMinutes);
@@ -294,6 +301,7 @@ export async function getReportDashboard(filters: ReportFilters) {
   const purchaseCategoryMap = new Map<string, { label: string; count: number; amount: number }>();
   const purchaseSupplierMap = new Map<string, { label: string; count: number; amount: number }>();
   const purchaseIngredientMap = new Map<string, { label: string; unit: string; quantity: number; amount: number; unitPrice: number }>();
+  const purchaseTrendMap = new Map<string, { date: string; amount: number; lineCount: number }>();
   const purchaseLines: Array<Record<string, unknown>> = [];
   let purchaseSpend = 0;
   let activePurchaseCount = 0;
@@ -321,15 +329,19 @@ export async function getReportDashboard(filters: ReportFilters) {
         const ingredientGroup = purchaseIngredientMap.get(ingredientKey) ?? {
           label: line.ingredientNameSnapshot, unit, quantity: 0, amount: 0, unitPrice: 0,
         };
-        ingredientGroup.quantity += quantity;
-        ingredientGroup.amount += transaction.voidedAt ? 0 : amount;
-        ingredientGroup.unitPrice = ingredientGroup.quantity > 0 ? ingredientGroup.amount / ingredientGroup.quantity : 0;
-        purchaseIngredientMap.set(ingredientKey, ingredientGroup);
         if (!transaction.voidedAt) {
+          ingredientGroup.quantity += quantity;
+          ingredientGroup.amount += amount;
           purchaseSpend += amount;
+          const purchaseTrend = purchaseTrendMap.get(purchaseDate) ?? { date: purchaseDate, amount: 0, lineCount: 0 };
+          purchaseTrend.amount += amount;
+          purchaseTrend.lineCount += 1;
+          purchaseTrendMap.set(purchaseDate, purchaseTrend);
           addGroup(purchaseCategoryMap, sheet.inventoryCategoryNameSnapshot, sheet.inventoryCategoryNameSnapshot, amount);
           addGroup(purchaseSupplierMap, sheet.supplierName.toLowerCase(), sheet.supplierName, amount);
         }
+        ingredientGroup.unitPrice = ingredientGroup.quantity > 0 ? ingredientGroup.amount / ingredientGroup.quantity : 0;
+        purchaseIngredientMap.set(ingredientKey, ingredientGroup);
         purchaseLines.push({
           reference: transaction.reference, purchaseDate, supplier: sheet.supplierName,
           invoiceNumber: sheet.invoiceNumber, category: sheet.inventoryCategoryNameSnapshot,
@@ -340,6 +352,24 @@ export async function getReportDashboard(filters: ReportFilters) {
       }
     }
   }
+
+  const purchaseTrend = [];
+  const purchaseCursor = new Date(range.dateStart);
+  for (let index = 0; index < range.days; index += 1) {
+    const key = purchaseCursor.toISOString().slice(0, 10);
+    purchaseTrend.push(purchaseTrendMap.get(key) ?? { date: key, amount: 0, lineCount: 0 });
+    purchaseCursor.setUTCDate(purchaseCursor.getUTCDate() + 1);
+  }
+
+  const operationsByChannel = ["WEBSITE", "ZOMATO", "SWIGGY"].map((channel) => {
+    const timing = channelOperations.get(channel) ?? { acceptance: [], preparation: [], handover: [] };
+    return {
+      channel,
+      averageAcceptanceSeconds: average(timing.acceptance), acceptanceCount: timing.acceptance.length,
+      averagePreparationSeconds: average(timing.preparation), preparationCount: timing.preparation.length,
+      averageReadyToHandoverSeconds: average(timing.handover), handoverCount: timing.handover.length,
+    };
+  });
 
   const latestLines = latestStocktake?.lines ?? [];
   let previousStocktake: typeof latestStocktake = null;
@@ -410,7 +440,7 @@ export async function getReportDashboard(filters: ReportFilters) {
     },
     kitchen: {
       acceptanceSla, preparationSla, activeLateOrders,
-      longestPreparation,
+      operationsByChannel, longestPreparation,
       timingSettings: timingSettings.map((setting) => ({
         channel: setting.channel,
         acceptanceAmberMinutes: setting.acceptanceAmberMinutes,
@@ -421,7 +451,7 @@ export async function getReportDashboard(filters: ReportFilters) {
     },
     purchases: {
       spend: purchaseSpend, transactionCount: activePurchaseCount, voidedTransactionCount: voidedPurchaseCount,
-      byCategory: sortedGroups(purchaseCategoryMap), bySupplier: sortedGroups(purchaseSupplierMap),
+      trend: purchaseTrend, byCategory: sortedGroups(purchaseCategoryMap), bySupplier: sortedGroups(purchaseSupplierMap),
       byIngredient: [...purchaseIngredientMap.values()].sort((a, b) => b.amount - a.amount),
       lines: purchaseLines.slice(0, 5000),
       voidedTransactions,
