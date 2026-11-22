@@ -282,9 +282,11 @@ function buildReportSheets(report: ReportDashboard): WorkbookSheet[] {
   ] });
   sheets.push({ name: "Channel Mix", rows: [
     ["Channel", "Orders (incl. cancelled)", "Non-cancelled order value (INR)", "Cancelled orders"],
-    ...(report.sales.channelMix ?? []).map((row: AnyRecord) => [
-      row.label, row.count, row.orderValue, (report.sales.cancellationByChannel ?? []).find((item: AnyRecord) => item.channel === row.channel)?.cancelled ?? 0,
-    ]),
+    ...(report.sales.channelMix ?? []).map((row: AnyRecord) => [row.label, row.count, row.orderValue, row.cancelled]),
+  ] });
+  sheets.push({ name: "Order Status", rows: [
+    ["Current status", "Orders"],
+    ...Object.entries(report.sales.statusCounts ?? {}).map(([status, count]) => [statusName(status), count]),
   ] });
   sheets.push({ name: "Order Register", rows: [
     ["Invoice", "KOT", "Created at (IST)", "Channel", "Status", "Order value (INR)", "Delivery charge (INR)", "Payment method", "Delivery area", "Bowl quantity", "Acceptance seconds", "Preparation seconds"],
@@ -293,10 +295,17 @@ function buildReportSheets(report: ReportDashboard): WorkbookSheet[] {
       row.total, row.deliveryCharge, row.paymentMethod, row.deliveryArea, row.bowlCount, row.acceptanceSeconds, row.preparationSeconds,
     ]),
   ] });
+  sheets.push({ name: "Kitchen Channel Ops", rows: [
+    ["Channel", "Acceptance avg. seconds", "Acceptance records", "Preparation avg. seconds", "Preparation records", "Ready to handover avg. seconds", "Handover records"],
+    ...(report.kitchen.operationsByChannel ?? []).map((row: AnyRecord) => [row.channel, row.averageAcceptanceSeconds, row.acceptanceCount, row.averagePreparationSeconds, row.preparationCount, row.averageReadyToHandoverSeconds, row.handoverCount]),
+  ] });
   sheets.push({ name: "Kitchen SLA", rows: [
     ["Stage", "Within threshold", "Amber", "Late", "Unconfigured"],
     ["Acceptance", report.kitchen.acceptanceSla.within, report.kitchen.acceptanceSla.amber, report.kitchen.acceptanceSla.late, report.kitchen.acceptanceSla.unconfigured],
     ["Preparation", report.kitchen.preparationSla.within, report.kitchen.preparationSla.amber, report.kitchen.preparationSla.late, report.kitchen.preparationSla.unconfigured],
+    [],
+    ["Channel", "Acceptance amber min", "Acceptance late min", "Preparation amber min", "Preparation late min"],
+    ...(report.kitchen.timingSettings ?? []).map((row: AnyRecord) => [row.channel, row.acceptanceAmberMinutes, row.acceptanceLateMinutes, row.preparationAmberMinutes, row.preparationLateMinutes]),
     [],
     ["Active order", "Invoice", "Channel", "Status", "Stage", "Elapsed seconds", "Late threshold minutes", "Received at"],
     ...(report.kitchen.activeLateOrders ?? []).map((row: AnyRecord) => [row.kotNumber, row.invoiceNumber, channelName(row.channel), statusName(row.status), row.stage, row.elapsedSeconds, row.lateThresholdMinutes, formatDateTime(row.createdAt)]),
@@ -304,6 +313,10 @@ function buildReportSheets(report: ReportDashboard): WorkbookSheet[] {
   sheets.push({ name: "Longest Preparation", rows: [
     ["KOT", "Invoice", "Channel", "Status", "Preparation seconds", "Received at"],
     ...(report.kitchen.longestPreparation ?? []).map((row: AnyRecord) => [row.kotNumber, row.invoiceNumber, channelName(row.channel), statusName(row.status), row.preparationSeconds, formatDateTime(row.createdAt)]),
+  ] });
+  sheets.push({ name: "Purchase Trend", rows: [
+    ["Purchase date", "Non-voided spend (INR)", "Purchase line count"],
+    ...(report.purchases.trend ?? []).map((row: AnyRecord) => [row.date, row.amount, row.lineCount]),
   ] });
   sheets.push({ name: "Purchase Summary", rows: [
     ["Category", "Recorded spend (INR)"],
@@ -329,6 +342,19 @@ function buildReportSheets(report: ReportDashboard): WorkbookSheet[] {
   sheets.push({ name: "Stocktake History", rows: [
     ["Stocktake date", "Recorded at", "Recorded by", "Recorded email", "Ingredient line count"],
     ...(report.inventory.history ?? []).map((row: AnyRecord) => [formatDate(row.stocktakeDate), formatDateTime(row.createdAt), row.recordedByName, row.recordedByEmail, row._count?.lines ?? 0]),
+  ] });
+  sheets.push({ name: "Report Notes", rows: [
+    ["Topic", "Definition / limitation"],
+    ["Order value", "Recorded total of non-cancelled orders; it is not proof of collected cash or accounting revenue."],
+    ["Average order value", "Non-cancelled order value divided by non-cancelled order count."],
+    ["Purchase spend", "Sum of non-voided purchase line amounts for sheets whose purchase dates fall in the selected period."],
+    ["Payment collection", "No payment settlement or collection record is currently available."],
+    ["Profit / COGS", "Not calculated; order bowls are not linked to immutable recipe versions and actual ingredient issues."],
+    ["Inventory changes", "Compares two stocktake snapshots; not a consumption or wastage calculation."],
+    ["Order high-volume safeguard", report.rowLimits.ordersTruncated ? "Order trend, hour and area breakdowns, SLA details and registers use the latest 5,000 order detail rows. Headline order totals, statuses and channel aggregates use full database counts/aggregates." : "No order detail row cap reached for this period."],
+    ["Purchase high-volume safeguard", report.rowLimits.purchasesTruncated ? "Purchase spend/category/supplier/ingredient breakdowns and line detail use the latest 5,000 purchase transactions in this period." : "No purchase transaction row cap reached for this period."],
+    ["Time zone", "Asia/Kolkata (IST)."],
+    ["Currency", "INR."],
   ] });
   sheets.push({ name: "Audit Log", rows: [
     ["Record type", "Reference", "Status / stage", "Channel / actor", "Amount (INR)", "Date", "Reason / note"],
