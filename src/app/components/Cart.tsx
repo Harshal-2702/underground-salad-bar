@@ -23,7 +23,7 @@ interface CartProps {
 }
 type CartView = 'cart' | 'checkout' | 'success';
 
-const DELIVERY_AREAS = [
+export const DELIVERY_AREAS = [
   { name: "Shivajinagar", deliveryCharge: 0 },
   { name: "Aundh", deliveryCharge: 0 },
   { name: "Baner", deliveryCharge: 0 },
