@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, ArrowRight, Check, CheckCircle2, ChevronDown, Minus, Plus, Sparkles, Trash2 } from "lucide-react";
+import { ArrowRight, Check, CheckCircle2, Minus, Plus, Sparkles, Trash2 } from "lucide-react";
 import { API_URL } from "../config";
 import { BOWL_CATEGORIES, type Bowl, type BowlItem } from "./BowlBuilder";
 import { DELIVERY_AREAS } from "./Cart";
