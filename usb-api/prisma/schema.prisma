@@ -584,3 +584,91 @@ model ReportEmailPreference {
 
   @@index([isEnabled, deliveryTime])
 }
+
+
+enum NCConsumerType {
+  STAFF
+  OWNER
+  GUEST
+  VENDOR
+  PARTNER
+  OTHER
+}
+
+enum NCPurpose {
+  STAFF_MEAL
+  MANAGEMENT
+  GUEST_COMPLIMENTARY
+  VENDOR_PARTNER
+  TASTING_QC
+  TRAINING
+  OTHER
+}
+
+enum NCMode {
+  PREPARE_NOW
+  ALREADY_CONSUMED
+}
+
+enum NCStatus {
+  QUEUED
+  PREPARING
+  READY
+  COMPLETED
+  VOIDED
+}
+
+model NCDailySequence {
+  businessDate DateTime @id @db.Date
+  lastSequence Int
+  updatedAt    DateTime @default(now()) @updatedAt @db.Timestamp(3)
+}
+
+model NCConsumptionEntry {
+  id               String          @id @default(cuid())
+  reference        String          @unique @db.VarChar(40)
+  businessDate     DateTime        @db.Date
+  sequence         Int
+  purpose          NCPurpose
+  mode             NCMode
+  status           NCStatus        @default(QUEUED)
+  consumerType     NCConsumerType
+  consumerName     String          @db.VarChar(120)
+  notes            String?         @db.Text
+  recordedByEmail  String          @db.VarChar(255)
+  completedAt      DateTime?       @db.Timestamp(3)
+  voidedAt         DateTime?       @db.Timestamp(3)
+  voidedByEmail    String?         @db.VarChar(255)
+  voidReason       String?         @db.VarChar(500)
+  menuValue        Decimal         @db.Decimal(18, 2)
+  createdAt        DateTime        @default(now()) @db.Timestamp(3)
+  updatedAt        DateTime        @updatedAt @db.Timestamp(3)
+
+  items NCConsumptionItem[]
+
+  @@unique([businessDate, sequence])
+  @@index([businessDate, status])
+  @@index([consumerName, businessDate])
+  @@index([recordedByEmail, businessDate])
+  @@index([purpose, businessDate])
+}
+
+model NCConsumptionItem {
+  id                    String   @id @default(cuid())
+  entryId               String
+  categoryIdSnapshot    String   @db.VarChar(40)
+  categoryNameSnapshot  String   @db.VarChar(80)
+  itemNameSnapshot      String   @db.VarChar(120)
+  scoops                Decimal  @db.Decimal(18, 3)
+  unitPriceSnapshot     Decimal  @db.Decimal(18, 2)
+  lineValue             Decimal  @db.Decimal(18, 2)
+  selectedOptions       Json?    @db.JsonB
+  sortOrder             Int      @default(0)
+  createdAt             DateTime @default(now()) @db.Timestamp(3)
+
+  entry NCConsumptionEntry @relation(fields: [entryId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([entryId, sortOrder])
+  @@index([itemNameSnapshot])
+  @@index([categoryIdSnapshot])
+}

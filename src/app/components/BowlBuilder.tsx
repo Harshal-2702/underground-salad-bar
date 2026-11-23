@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { API_URL } from "../config";
 import { Plus, Minus, X, Check, ChevronLeft, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -66,15 +67,6 @@ const LAYER_COLORS = {
   dressing:{ color: '#FF8C00', label: '✨ Dressing' },
 };
 
-const categories = [
-  { id: 'base',     name: 'Base',     subtitle: 'Your foundation',        pricePerScoop: 40,  items: ['Rice', 'Wrap'],                                                             note: null },
-  { id: 'protein',  name: 'Protein',  subtitle: 'Fresh-grilled daily',    pricePerScoop: 59,  items: ['Chicken', 'Paneer', 'Soya Chunks'],                                         note: null },
-  { id: 'veggies',  name: 'Veggies',  subtitle: 'Pick as many as you like', pricePerScoop: 40, items: ['Carrot', 'Beetroot', 'Baby Potato', 'Broccoli', 'Bell Pepper', 'Lettuce', 'Onion', 'Corn'], note: 'Unlimited variety per scoop' },
-  { id: 'beans',    name: 'Beans',    subtitle: 'Extra protein & fibre',   pricePerScoop: 30,  items: ['Chickpeas', 'Kidney Beans'],                                                note: null },
-  { id: 'dressing', name: 'Dressing', subtitle: 'The magic touch',         pricePerScoop: 50,  items: ['Makhni', 'Spinach', 'Hung Curd Garlic', 'Pesto', 'Paprika', 'Chipotle'], note: null },
-];
-
-export const BOWL_CATEGORIES = categories;
 
 // Visual bowl preview
 function RealisticBowlPreview({ selectedItems, selectedVeggies, veggieScoops }: {
@@ -179,12 +171,30 @@ function RealisticBowlPreview({ selectedItems, selectedVeggies, veggieScoops }: 
 }
 
 export function BowlBuilder({ isOpen, onClose, onAddToCart }: BowlBuilderProps) {
+  const [menuCategories, setMenuCategories] = useState<Array<{id:string;name:string;subtitle:string;pricePerScoop:number;items:string[];note?:string|null}>>([]);
+  const [menuLoading, setMenuLoading] = useState(true);
+  const [menuError, setMenuError] = useState("");
+  const categories = menuCategories;
+  useEffect(() => {
+    let active = true;
+    fetch(API_URL + "/menu")
+      .then(async (response) => { if (!response.ok) throw new Error("Menu unavailable"); return response.json(); })
+      .then((catalogue) => {
+        if (active && Array.isArray(catalogue.categories) && catalogue.categories.length) setMenuCategories(catalogue.categories);
+        else if (active) setMenuError("The shared menu has no active categories.");
+      })
+      .catch(() => { if (active) setMenuError("Unable to load the current menu. Please refresh and try again."); })
+      .finally(() => { if (active) setMenuLoading(false); });
+    return () => { active = false; };
+  }, []);
   const [currentStep, setCurrentStep] = useState(0);
   const [selectedItems, setSelectedItems] = useState<BowlItem[]>([]);
   const [veggieScoops, setVeggieScoops] = useState(0);
   const [selectedVeggies, setSelectedVeggies] = useState<string[]>([]);
 
   if (!isOpen) return null;
+  if (menuLoading) return <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40"><div className="rounded-2xl bg-white px-8 py-6 text-sm text-[#1F3D2B]">Loading the current menu…</div></div>;
+  if (menuError || categories.length === 0) return <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40"><div className="rounded-2xl bg-white px-8 py-6 text-sm text-red-700">{menuError || "The current menu is unavailable."}</div></div>;
 
   const currentCategory = categories[currentStep];
 
@@ -411,7 +421,7 @@ const getCurrentSelection = () => {
       id: 'current-veggie-preview',
       name: 'Veggie Scoop',
       category: 'veggies',
-      price: categories[2].pricePerScoop,
+      price: menuCategories[2].pricePerScoop,
       scoops: veggieScoops,
       veggieSelection: selectedVeggies,
     });
@@ -525,7 +535,7 @@ const handleClose = () => {
 
         {/* Progress */}
         <div className="flex shrink-0 bg-[#1F3D2B]">
-          {categories.map((cat, i) => (
+          {menuCategories.map((cat, i) => (
             <div key={i} className="flex-1 h-1 transition-all" style={{
               backgroundColor: i < currentStep ? '#E98A15' : i === currentStep ? '#E2BD87' : 'rgba(255,255,255,0.1)'
             }} />

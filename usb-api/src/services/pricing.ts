@@ -42,6 +42,39 @@ export const INGREDIENT_PRICING = {
   },
 } as const;
 
+export const SIGNATURE_BOWLS = [
+  {
+    id: "continental",
+    name: "Continental Bowl",
+    tagline: "Light. Fresh. Balanced.",
+    description: "Continental protein bowl featuring cilantro rice, herb-grilled chicken / paneer, and exotic sautéed vegetables, served with your choice of one signature sauce — Wild mushroom sauce, Smoky BBQ, or Korean chilli sauce (additional sauces available as optional add-ons).",
+    price: 289,
+    tag: "Best Seller",
+    tagColor: "#1F3D2B",
+    accentColor: "#1F3D2B",
+  },
+  {
+    id: "mexican",
+    name: "Burrito Bowl",
+    tagline: "Bold. Smoky. Satisfying.",
+    description: "A loaded Mexican burrito bowl with cilantro lime rice, black beans, grilled chicken / paneer, bell peppers, guacamole, sour cream, corn salsa, pico de gallo, jalapeños, olives, cheese, and crunchy nachos for the perfect balance of fresh and bold flavors.",
+    price: 339,
+    tag: "Fan Favourite",
+    tagColor: "#B36235",
+    accentColor: "#B36235",
+  },
+  {
+    id: "kimchi",
+    name: "Kimchi Rice",
+    tagline: "Spicy. Fermented. Alive.",
+    description: "A hearty Korean rice bowl with juicy gochujang chicken / Paneer, fermented kimchi, crisp vegetables, and steamed rice, all mixed together for bold, authentic flavors & top up with runny sunny side up.",
+    price: 279,
+    tag: "New",
+    tagColor: "#E98A15",
+    accentColor: "#E98A15",
+  },
+] as const;
+
 export const DELIVERY_CHARGES: Readonly<Record<string, number>> = {
   Shivajinagar: 0,
   Aundh: 0,
@@ -60,8 +93,86 @@ export const DELIVERY_CHARGES: Readonly<Record<string, number>> = {
   Other: 60,
 };
 
+
+const MENU_CATEGORY_METADATA: Record<string, { name: string; subtitle: string; note: string | null }> = {
+  base: { name: "Base", subtitle: "Your foundation", note: null },
+  protein: { name: "Protein", subtitle: "Fresh-grilled daily", note: null },
+  veggies: { name: "Veggies", subtitle: "Pick as many as you like", note: "Unlimited variety per scoop" },
+  beans: { name: "Beans", subtitle: "Extra protein & fibre", note: null },
+  dressing: { name: "Dressing", subtitle: "The magic touch", note: null },
+};
+
+/** The single public menu source used by Customer ordering and staff NC entry. */
+export function getPublicMenuCatalog() {
+  return {
+    signatureBowls: SIGNATURE_BOWLS.map((bowl) => ({ ...bowl })),
+    categories: Object.entries(INGREDIENT_PRICING).map(([id, category]) => ({
+      id,
+      ...(MENU_CATEGORY_METADATA[id] ?? { name: id, subtitle: "", note: null }),
+      pricePerScoop: category.pricePerScoop,
+      items: [...category.ingredients],
+    })),
+    deliveryAreas: Object.entries(DELIVERY_CHARGES).map(([name, deliveryCharge]) => ({
+      name,
+      deliveryCharge,
+    })),
+  };
+}
+
+export interface PricedNcMenuItem {
+  category: string;
+  categoryNameSnapshot: string;
+  itemName: string;
+  scoops: number;
+  unitPrice: number;
+  lineValue: number;
+  selectedOptions: string[] | null;
+}
+
+/** Validate NC selections with the exact same menu rules as customer checkout. */
+export function calculateNcMenuPricing(itemsInput: unknown): {
+  items: PricedNcMenuItem[];
+  totalMenuValue: number;
+} {
+  if (!Array.isArray(itemsInput) || itemsInput.length === 0 || itemsInput.length > 30) {
+    throw new PricingValidationError("Select between 1 and 30 NC menu items.");
+  }
+  // Reuse the exact customer order validator. A signature bowl is a complete
+  // item and is validated separately so one NC entry can contain several bowls.
+  const regularItems = itemsInput.filter((rawItem) =>
+    !isRecord(rawItem) || rawItem.category !== "signature",
+  );
+  const signatureItems = itemsInput.filter((rawItem) =>
+    isRecord(rawItem) && rawItem.category === "signature",
+  );
+  if (regularItems.length > 0) priceOneBowl({ items: regularItems }, 0);
+  signatureItems.forEach((item, index) => priceOneBowl({ items: [item] }, index));
+
+  const items = itemsInput.map((rawItem) => {
+    const item = rawItem as Record<string, unknown>;
+    const category = item.category as string;
+    const scoops = item.scoops as number;
+    const isVeggie = category === "veggies";
+    const isSignature = category === "signature";
+    const itemName = isVeggie ? "Veggie Scoop" : item.name as string;
+    const signature = isSignature ? SIGNATURE_BOWLS.find((bowl) => bowl.name === itemName) : undefined;
+    const unitPrice = signature?.price ?? INGREDIENT_PRICING[category as keyof typeof INGREDIENT_PRICING]?.pricePerScoop;
+    if (unitPrice === undefined) throw new PricingValidationError("The selected menu item is no longer available.");
+    const selectedOptions = isVeggie ? [...(item.veggieSelection as string[])] : null;
+    const categoryNameSnapshot = isSignature ? "Signature bowls" : MENU_CATEGORY_METADATA[category]?.name ?? category;
+    const lineValue = money(unitPrice * scoops);
+
+    return { category, categoryNameSnapshot, itemName, scoops, unitPrice, lineValue, selectedOptions };
+  });
+
+  return {
+    items,
+    totalMenuValue: money(items.reduce((sum, item) => sum + item.lineValue, 0)),
+  };
+}
+
 const VEGGIE_NAMES = new Set<string>(INGREDIENT_PRICING.veggies.ingredients);
-const CATEGORY_NAMES = new Set(Object.keys(INGREDIENT_PRICING));
+const CATEGORY_NAMES = new Set([...Object.keys(INGREDIENT_PRICING), "signature"]);
 
 export class PricingValidationError extends Error {
   constructor(message: string) {
@@ -71,7 +182,7 @@ export class PricingValidationError extends Error {
 }
 
 export interface PricedBowl {
-  bowlName: "Build Your Own Bowl";
+  bowlName: string;
   quantity: 1;
   price: number;
   details: string;
@@ -113,9 +224,15 @@ function priceOneBowl(input: unknown, index: number): PricedBowl {
     throw new PricingValidationError(`Bowl ${index + 1} has invalid or missing ingredient selections.`);
   }
 
+  const hasSignature = input.items.some((rawItem) => isRecord(rawItem) && rawItem.category === "signature");
+  if (hasSignature && input.items.length !== 1) {
+    throw new PricingValidationError("A signature bowl must be ordered as its own bowl.");
+  }
+
   const seenItems = new Set<string>();
   const beanScoops: number[] = [];
   let bowlTotal = 0;
+  let bowlName = "Build Your Own Bowl";
   const details: string[] = [];
 
   for (const rawItem of input.items) {
@@ -127,15 +244,25 @@ function priceOneBowl(input: unknown, index: number): PricedBowl {
     if (typeof category !== "string" || !CATEGORY_NAMES.has(category)) {
       throw new PricingValidationError("An ingredient has an unknown category.");
     }
-    if (typeof name !== "string" || name.trim().length === 0 || name.length > 80) {
+    if (typeof name !== "string" || name.trim().length === 0 || name.length > 120) {
       throw new PricingValidationError("An ingredient has an invalid name.");
     }
 
-    const pricing = INGREDIENT_PRICING[category as keyof typeof INGREDIENT_PRICING];
+    const isSignature = category === "signature";
+    const signature = isSignature ? SIGNATURE_BOWLS.find((item) => item.name === name) : undefined;
     const isVeggieScoop = category === "veggies";
     const expectedName = isVeggieScoop ? "Veggie Scoop" : name;
+    const pricing = isSignature ? null : INGREDIENT_PRICING[category as keyof typeof INGREDIENT_PRICING];
 
-    if (isVeggieScoop) {
+    if (isSignature) {
+      if (!signature) throw new PricingValidationError(`"${name}" is not an available signature bowl.`);
+      if (veggieSelection !== undefined) throw new PricingValidationError("Signature bowls cannot include custom veggie selections.");
+      const quantity = rawItem.scoops;
+      if (typeof quantity !== "number" || !Number.isInteger(quantity) || quantity < 1 || quantity > 20) {
+        throw new PricingValidationError("Signature bowl quantity must be between 1 and 20.");
+      }
+      bowlName = signature.name;
+    } else if (isVeggieScoop) {
       if (name !== "Veggie Scoop" || !Array.isArray(veggieSelection) || veggieSelection.length === 0 || veggieSelection.length > VEGGIE_NAMES.size) {
         throw new PricingValidationError("A veggie scoop must include at least one valid vegetable.");
       }
@@ -147,7 +274,7 @@ function priceOneBowl(input: unknown, index: number): PricedBowl {
         selected.add(veggie);
       }
     } else {
-      if (!(pricing.ingredients as readonly string[]).includes(name)) {
+      if (!pricing || !(pricing.ingredients as readonly string[]).includes(name)) {
         throw new PricingValidationError(`"${name}" is not a valid ${category} ingredient.`);
       }
       if (veggieSelection !== undefined && (!Array.isArray(veggieSelection) || veggieSelection.length > 0)) {
@@ -155,16 +282,14 @@ function priceOneBowl(input: unknown, index: number): PricedBowl {
       }
     }
 
-    const scoops = validateScoops(category, rawItem.scoops, expectedName);
+    const scoops = isSignature ? rawItem.scoops as number : validateScoops(category, rawItem.scoops, expectedName);
     const uniqueKey = `${category}:${expectedName}`;
-    if (seenItems.has(uniqueKey)) {
-      throw new PricingValidationError(`Repeated ingredient selection: ${expectedName}.`);
-    }
+    if (seenItems.has(uniqueKey)) throw new PricingValidationError(`Repeated ingredient selection: ${expectedName}.`);
     seenItems.add(uniqueKey);
 
     if (category === "beans") beanScoops.push(scoops);
-
-    const lineTotal = money(pricing.pricePerScoop * scoops);
+    const unitPrice = signature?.price ?? pricing?.pricePerScoop ?? 0;
+    const lineTotal = money(unitPrice * scoops);
     bowlTotal = money(bowlTotal + lineTotal);
 
     const scoopLabel = scoops === 1 ? "" : ` x${scoops}`;
@@ -172,15 +297,8 @@ function priceOneBowl(input: unknown, index: number): PricedBowl {
     details.push(`${category.toUpperCase()}: ${expectedName}${scoopLabel}${veggieLabel}`);
   }
 
-  if (beanScoops.length > 2) {
-    throw new PricingValidationError("A bowl can contain no more than two bean varieties.");
-  }
-  return {
-    bowlName: "Build Your Own Bowl",
-    quantity: 1,
-    price: bowlTotal,
-    details: details.join("\n"),
-  };
+  if (beanScoops.length > 2) throw new PricingValidationError("A bowl can contain no more than two bean varieties.");
+  return { bowlName, quantity: 1, price: bowlTotal, details: details.join("\n") };
 }
 
 /** Validates customer selections and calculates every amount on the server. */

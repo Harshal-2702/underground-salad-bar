@@ -2,7 +2,7 @@ import { OrderStatus, Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import { getIndiaBusinessDate, isDateKey } from "./india-date.js";
 
-export const REPORT_IDS = ["overview", "sales", "kitchen", "purchases", "inventory", "audit"] as const;
+export const REPORT_IDS = ["overview", "sales", "kitchen", "purchases", "inventory", "audit", "nc"] as const;
 export type ReportId = (typeof REPORT_IDS)[number];
 export type ReportChannel = "ALL" | "WEBSITE" | "ZOMATO" | "SWIGGY";
 
@@ -102,7 +102,7 @@ export async function getReportDashboard(filters: ReportFilters) {
     sheets: { some: { purchaseDate: { gte: range.dateStart, lt: range.dateEnd } } },
   };
 
-  const [ordersRaw, purchaseTransactionsRaw, latestStocktake, stocktakeHistory, timingSettings, totalOrderCount, orderStatusAggregates, channelStatusAggregates, orderTimingAggregates] = await Promise.all([
+  const [ordersRaw, purchaseTransactionsRaw, latestStocktake, stocktakeHistory, timingSettings, totalOrderCount, orderStatusAggregates, channelStatusAggregates, orderTimingAggregates, ncEntriesRaw, ncHeadlineAggregate, ncStatusAggregates, ncPurposeAggregates] = await Promise.all([
     prisma.order.findMany({
       where: orderWhere,
       orderBy: [{ createdAt: "desc" }, { kotSequence: "desc" }],
@@ -163,10 +163,33 @@ export async function getReportDashboard(filters: ReportFilters) {
       _avg: { acceptanceDurationSeconds: true, preparationDurationSeconds: true },
       _count: { acceptanceDurationSeconds: true, preparationDurationSeconds: true },
     }),
+    prisma.nCConsumptionEntry.findMany({
+      where: { businessDate: { gte: range.dateStart, lt: range.dateEnd } },
+      orderBy: [{ businessDate: "desc" }, { sequence: "desc" }],
+      take: 5001,
+      include: { items: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] } },
+    }),
+    prisma.nCConsumptionEntry.aggregate({
+      where: { businessDate: { gte: range.dateStart, lt: range.dateEnd }, status: { not: "VOIDED" } },
+      _count: { _all: true },
+      _sum: { menuValue: true },
+    }),
+    prisma.nCConsumptionEntry.groupBy({
+      by: ["status"],
+      where: { businessDate: { gte: range.dateStart, lt: range.dateEnd } },
+      _count: { _all: true },
+    }),
+    prisma.nCConsumptionEntry.groupBy({
+      by: ["purpose"],
+      where: { businessDate: { gte: range.dateStart, lt: range.dateEnd }, status: { not: "VOIDED" } },
+      _count: { _all: true },
+      _sum: { menuValue: true },
+    }),
   ]);
 
   const orders = ordersRaw.slice(0, 5000);
   const purchaseTransactions = purchaseTransactionsRaw.slice(0, 5000);
+  const ncEntries = ncEntriesRaw.slice(0, 5000);
   const hasMoreOrders = ordersRaw.length > 5000;
   const hasMorePurchases = purchaseTransactionsRaw.length > 5000;
   const now = new Date();
@@ -416,6 +439,26 @@ export async function getReportDashboard(filters: ReportFilters) {
     change: previousQuantity.has(line.ingredientId) ? money(line.quantity) - (previousQuantity.get(line.ingredientId) ?? 0) : null,
   }));
 
+  const ncPurposeMap = new Map<string, { label: string; count: number; amount: number }>();
+  const ncConsumerMap = new Map<string, { label: string; count: number; amount: number }>();
+  const ncItemMap = new Map<string, { label: string; category: string; quantity: number; amount: number }>();
+  const validNcEntries = ncEntries.filter((entry) => entry.status !== "VOIDED");
+  const ncMenuValue = money(ncHeadlineAggregate._sum.menuValue);
+  for (const entry of validNcEntries) {
+    addGroup(ncPurposeMap, entry.purpose, entry.purpose.replaceAll("_", " "), money(entry.menuValue));
+    addGroup(ncConsumerMap, entry.consumerName.toLowerCase(), entry.consumerName, money(entry.menuValue));
+    for (const item of entry.items) {
+      const key = item.categoryIdSnapshot + "|" + item.itemNameSnapshot;
+      const group = ncItemMap.get(key) ?? {
+        label: item.itemNameSnapshot, category: item.categoryNameSnapshot, quantity: 0, amount: 0,
+      };
+      group.quantity += money(item.scoops);
+      group.amount += money(item.lineValue);
+      ncItemMap.set(key, group);
+    }
+  }
+  const ncVoidedEntries = ncEntries.filter((entry) => entry.status === "VOIDED");
+
   const completedOrdersMissingTiming = orders.filter((order) =>
     order.status !== "PENDING" && order.status !== "CANCELLED" &&
     (order.acceptanceDurationSeconds == null || (order.readyAt != null && order.preparationDurationSeconds == null)),
@@ -431,6 +474,7 @@ export async function getReportDashboard(filters: ReportFilters) {
       ordersTruncated: hasMoreOrders,
       purchasesTruncated: hasMorePurchases,
       purchaseLinesTruncated: purchaseLines.length > 5000,
+      ncEntriesTruncated: ncEntriesRaw.length > 5000,
     },
     overview: {
       totalOrders: totalOrderCount,
@@ -490,12 +534,39 @@ export async function getReportDashboard(filters: ReportFilters) {
       snapshot: inventorySnapshot,
       history: stocktakeHistory,
     },
+    nc: {
+      entryCount: ncHeadlineAggregate._count._all,
+      menuValue: ncMenuValue,
+      queuedCount: ncStatusAggregates.find((entry) => entry.status === "QUEUED")?._count._all ?? 0,
+      preparingCount: ncStatusAggregates.find((entry) => entry.status === "PREPARING")?._count._all ?? 0,
+      readyCount: ncStatusAggregates.find((entry) => entry.status === "READY")?._count._all ?? 0,
+      completedCount: ncStatusAggregates.find((entry) => entry.status === "COMPLETED")?._count._all ?? 0,
+      voidedCount: ncStatusAggregates.find((entry) => entry.status === "VOIDED")?._count._all ?? 0,
+      byPurpose: ncPurposeAggregates.map((entry) => ({ label: entry.purpose.replaceAll("_", " "), count: entry._count._all, amount: money(entry._sum.menuValue) })).sort((a, b) => b.amount - a.amount || b.count - a.count),
+      byConsumer: sortedGroups(ncConsumerMap),
+      byItem: [...ncItemMap.values()].sort((a, b) => b.amount - a.amount),
+      entries: ncEntries.map((entry) => ({
+        id: entry.id, reference: entry.reference, businessDate: entry.businessDate,
+        purpose: entry.purpose, mode: entry.mode, status: entry.status,
+        consumerType: entry.consumerType, consumerName: entry.consumerName,
+        recordedByEmail: entry.recordedByEmail, notes: entry.notes,
+        menuValue: money(entry.menuValue), createdAt: entry.createdAt,
+        completedAt: entry.completedAt, voidedAt: entry.voidedAt,
+        voidedByEmail: entry.voidedByEmail, voidReason: entry.voidReason,
+        items: entry.items.map((item) => ({
+          category: item.categoryNameSnapshot, item: item.itemNameSnapshot,
+          scoops: money(item.scoops), unitMenuValue: money(item.unitPriceSnapshot),
+          lineValue: money(item.lineValue), selectedOptions: item.selectedOptions,
+        })),
+      })),
+    },
     audit: {
       cancelledOrders: orders.filter((order) => order.status === "CANCELLED").map((order) => ({
         kotNumber: order.kotNumber, invoiceNumber: order.invoiceNumber,
         channel: order.channel, total: money(order.total), cancelledAt: order.cancelledAt,
       })),
       voidedTransactions,
+      voidedNcEntries: ncVoidedEntries.map((entry) => ({ reference: entry.reference, consumerName: entry.consumerName, menuValue: money(entry.menuValue), voidedAt: entry.voidedAt, voidedByEmail: entry.voidedByEmail, voidReason: entry.voidReason })),
       activeLateOrders,
       completedOrdersMissingTiming,
     },

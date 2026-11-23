@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { X, Trash2, Plus, ArrowRight, CheckCircle2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Bowl, BowlItem } from "./BowlBuilder";
@@ -23,25 +23,6 @@ interface CartProps {
 }
 type CartView = 'cart' | 'checkout' | 'success';
 
-export const DELIVERY_AREAS = [
-  { name: "Shivajinagar", deliveryCharge: 0 },
-  { name: "Aundh", deliveryCharge: 0 },
-  { name: "Baner", deliveryCharge: 0 },
-  { name: "Balewadi", deliveryCharge: 0 },
-  { name: "Pashan", deliveryCharge: 0 },
-  { name: "Pimple Saudagar", deliveryCharge: 0 },
-  { name: "Pimple Nilakh", deliveryCharge: 0 },
-  { name: "Bopodi", deliveryCharge: 0 },
-  { name: "Pune University", deliveryCharge: 0 },
-  { name: "Camp", deliveryCharge: 50 },
-  { name: "Sus Road", deliveryCharge: 50 },
-  { name: "Wakad", deliveryCharge: 50 },
-  { name: "Khadki", deliveryCharge: 50 },
-  { name: "Wakdewadi", deliveryCharge: 50 },
-
-  { name: "Other", deliveryCharge: 60 },
-];
-
 export function Cart({
 
 isOpen,
@@ -58,6 +39,22 @@ onBuildAnother,
 
 }: CartProps){
   const [view, setView] = useState<CartView>('cart');
+  const [deliveryAreas, setDeliveryAreas] = useState<Array<{name:string;deliveryCharge:number}>>([]);
+  const [deliveryAreasLoading, setDeliveryAreasLoading] = useState(true);
+  const [deliveryAreasError, setDeliveryAreasError] = useState("");
+  useEffect(() => {
+    let active = true;
+    fetch(API_URL + "/menu")
+      .then(async (response) => { if (!response.ok) throw new Error("Menu unavailable"); return response.json(); })
+      .then((catalogue) => {
+        if (!active) return;
+        if (Array.isArray(catalogue.deliveryAreas) && catalogue.deliveryAreas.length) setDeliveryAreas(catalogue.deliveryAreas);
+        else setDeliveryAreasError("Delivery areas are unavailable. Please refresh before placing an order.");
+      })
+      .catch((error) => { if (active) setDeliveryAreasError(error instanceof Error ? error.message : "Unable to load delivery areas."); })
+      .finally(() => { if (active) setDeliveryAreasLoading(false); });
+    return () => { active = false; };
+  }, []);
   const [form, setForm] = useState({ firstName: '', lastName: '', phone: '', address: '', area: '', city: 'Pune' });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -66,7 +63,7 @@ onBuildAnother,
   const [confirmedOrderTotal, setConfirmedOrderTotal] = useState<number | null>(null);
 
 // Find selected area's delivery charge
-const selectedArea = DELIVERY_AREAS.find(
+const selectedArea = deliveryAreas.find(
   area => area.name === form.area
 );
 
@@ -165,7 +162,8 @@ const deleteIngredient = (bowlId: string, itemId: string) => {
     if (!form.lastName.trim()) e.lastName = 'Last name is required';
     if (!/^[6-9]\d{9}$/.test(form.phone)) e.phone = 'Enter a valid 10-digit phone number';
     if (!form.address.trim()) e.address = 'Address is required';
-    if (!form.area) e.area = 'Please select your area';
+    if (!form.area) e.area = deliveryAreasError || 'Please select your area';
+    if (deliveryAreasLoading || deliveryAreas.length === 0 || deliveryAreasError) e.area = deliveryAreasError || 'Delivery options are not ready. Please try again.';
     return e;
   };
 
@@ -556,17 +554,18 @@ setView("success");
                     <label className="font-['Sora'] text-sm font-semibold text-[#1F3D2B] block mb-1.5">Area *</label>
                     <select
                       value={form.area}
+                      disabled={deliveryAreasLoading || deliveryAreas.length === 0 || Boolean(deliveryAreasError)}
                       onChange={e => { setForm(f => ({ ...f, area: e.target.value })); setErrors(err => ({ ...err, area: '' })); }}
                       className={`w-full px-4 py-3 rounded-xl border font-['Sora'] text-sm bg-white outline-none transition-colors ${errors.area ? 'border-red-400' : 'border-[#1A1209]/15 focus:border-[#1F3D2B]'}`}
                     >
-                      <option value="">Select your area</option>
-                     {DELIVERY_AREAS.map(area => (
+                      <option value="">{deliveryAreasLoading ? "Loading delivery areas…" : "Select your area"}</option>
+                     {deliveryAreas.map(area => (
                       <option key={area.name} value={area.name}>
                       {area.name}
                       </option>
                       ))}
                     </select>
-                    {errors.area && <p className="font-['Sora'] text-red-500 text-xs mt-1">{errors.area}</p>}
+                    {(errors.area || deliveryAreasError) && <p className="font-['Sora'] text-red-500 text-xs mt-1">{errors.area || deliveryAreasError}</p>}
                   </div>
 
                   {/* City — locked to Pune */}

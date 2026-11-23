@@ -2,6 +2,7 @@ import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import orderRoutes from "./routes/order.routes.js";
+import menuRouter from "./routes/menu.routes.js";
 import {
   ingredientRouter,
   unitRouter,
@@ -14,6 +15,7 @@ import { inventoryCategoryRouter } from "./routes/inventory-category.routes.js";
 import { purchaseRouter } from "./routes/purchase.routes.js";
 import { leftoverInventoryRouter } from "./routes/leftover-inventory.routes.js";
 import reportsRouter from "./routes/reports.routes.js";
+import ncRouter from "./routes/nc.routes.js";
 
 const app = express();
 
@@ -84,6 +86,7 @@ app.get("/health", (_req, res) => {
 });
 
 // Public customer checkout; staff order endpoints require authentication.
+app.use("/menu", menuRouter);
 app.use("/orders", orderRoutes);
 
 // Staff-only ingredient catalogue APIs.
@@ -95,6 +98,7 @@ app.use("/inventory-categories", inventoryCategoryRouter);
 app.use("/purchases", purchaseRouter);
 app.use("/leftover-inventory", leftoverInventoryRouter);
 app.use("/reports", reportsRouter);
+app.use("/nc", ncRouter);
 app.use("/recipes", recipeRouter);
 app.use("/kot", kotRoutes);
 
