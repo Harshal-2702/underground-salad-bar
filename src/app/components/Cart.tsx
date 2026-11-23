@@ -23,26 +23,7 @@ interface CartProps {
 }
 type CartView = 'cart' | 'checkout' | 'success';
 
-export const DELIVERY_AREAS = [
-  { name: "Shivajinagar", deliveryCharge: 0 },
-  { name: "Aundh", deliveryCharge: 0 },
-  { name: "Baner", deliveryCharge: 0 },
-  { name: "Balewadi", deliveryCharge: 0 },
-  { name: "Pashan", deliveryCharge: 0 },
-  { name: "Pimple Saudagar", deliveryCharge: 0 },
-  { name: "Pimple Nilakh", deliveryCharge: 0 },
-  { name: "Bopodi", deliveryCharge: 0 },
-  { name: "Pune University", deliveryCharge: 0 },
-  { name: "Camp", deliveryCharge: 50 },
-  { name: "Sus Road", deliveryCharge: 50 },
-  { name: "Wakad", deliveryCharge: 50 },
-  { name: "Khadki", deliveryCharge: 50 },
-  { name: "Wakdewadi", deliveryCharge: 50 },
-
-  { name: "Other", deliveryCharge: 60 },
-];
-
-export function Cart({
+xport function Cart({
 
 isOpen,
 
@@ -58,7 +39,7 @@ onBuildAnother,
 
 }: CartProps){
   const [view, setView] = useState<CartView>('cart');
-  const [deliveryAreas, setDeliveryAreas] = useState(DELIVERY_AREAS);
+  const [deliveryAreas, setDeliveryAreas] = useState<Array<{name:string;deliveryCharge:number}>>([]);
   useEffect(() => {
     let active = true;
     fetch(API_URL + "/menu")
@@ -66,7 +47,7 @@ onBuildAnother,
       .then((catalogue) => {
         if (active && Array.isArray(catalogue.deliveryAreas) && catalogue.deliveryAreas.length) setDeliveryAreas(catalogue.deliveryAreas);
       })
-      .catch(() => { /* Keep bundled delivery areas if the API is temporarily unavailable. */ });
+      .catch(() => { /* The API remains the only source of current delivery areas. */ });
     return () => { active = false; };
   }, []);
   const [form, setForm] = useState({ firstName: '', lastName: '', phone: '', address: '', area: '', city: 'Pune' });
