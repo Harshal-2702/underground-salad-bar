@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ArrowRight, Check, CheckCircle2, Minus, Plus, Sparkles, Trash2 } from "lucide-react";
 import { API_URL } from "../config";
-import { BOWL_CATEGORIES, type Bowl, type BowlItem } from "./BowlBuilder";
-import { DELIVERY_AREAS } from "./Cart";
+import type { Bowl, BowlItem } from "./BowlBuilder";
 import "./QuickOrderPage.css";
 
 type CategoryDefinition = {
@@ -77,8 +76,10 @@ function QuickOrderField({
 
 export function QuickOrderPage() {
   const [form, setForm] = useState<CustomerForm>(INITIAL_FORM);
-  const [categories, setCategories] = useState<readonly CategoryDefinition[]>(BOWL_CATEGORIES as readonly CategoryDefinition[]);
-  const [deliveryAreas, setDeliveryAreas] = useState(DELIVERY_AREAS);
+  const [categories, setCategories] = useState<readonly CategoryDefinition[]>([]);
+  const [deliveryAreas, setDeliveryAreas] = useState<Array<{name:string;deliveryCharge:number}>>([]);
+  const [menuLoading, setMenuLoading] = useState(true);
+  const [menuError, setMenuError] = useState("");
   const [draftItems, setDraftItems] = useState<BowlItem[]>([]);
   const [selectedVeggies, setSelectedVeggies] = useState<string[]>([]);
   const [veggieScoops, setVeggieScoops] = useState(0);
@@ -115,8 +116,10 @@ export function QuickOrderPage() {
         if (!active) return;
         if (Array.isArray(catalogue.categories) && catalogue.categories.length) setCategories(catalogue.categories);
         if (Array.isArray(catalogue.deliveryAreas) && catalogue.deliveryAreas.length) setDeliveryAreas(catalogue.deliveryAreas);
+        if (!Array.isArray(catalogue.categories) || !catalogue.categories.length) setMenuError("The shared menu has no active categories.");
       })
-      .catch(() => { /* Keep bundled customer fallback if the API is temporarily unavailable. */ });
+      .catch(() => { if (active) setMenuError("Unable to load the current menu. Please refresh and try again."); })
+      .finally(() => { if (active) setMenuLoading(false); });
     return () => { active = false; };
   }, []);
 
@@ -398,7 +401,7 @@ export function QuickOrderPage() {
           <span className="qo-price-note">Live price estimate · final price confirmed at checkout</span>
         </div>
 
-        <div className="qo-menu-groups">
+        {menuLoading ? <p className="qo-menu-intro">Loading the current menu…</p> : menuError ? <p className="qo-form-error">{menuError}</p> : <div className="qo-menu-groups">
           {menuSections.map((category, index) => (
             <section className="qo-category-panel" key={category.id}>
               <div className="qo-category-heading">
@@ -442,7 +445,7 @@ export function QuickOrderPage() {
               {category.id === "veggies" && <p className="qo-category-footnote">Your selected varieties are mixed together in one veggie scoop. Add extra scoops if you’re feeling hungry.</p>}
             </section>
           ))}
-        </div>
+        </div>}
 
         <div className="qo-draft-footer">
           <div><span>THIS BOWL’S ESTIMATE</span><strong>{formatMoney(draftTotal)}</strong><small>{draftBowlItems.length} ingredient line{draftBowlItems.length !== 1 ? "s" : ""} selected</small></div>
@@ -499,7 +502,7 @@ export function QuickOrderPage() {
 
       <div className="qo-sticky-order">
         <div><span>{savedItemCount} bowl{savedItemCount !== 1 ? "s" : ""} saved</span><strong>{formatMoney(estimatedTotal)}</strong></div>
-        <button type="button" onClick={placeOrder} disabled={isPlacingOrder || bowls.length === 0 || Boolean(editingBowlId)}>
+        <button type="button" onClick={placeOrder} disabled={isPlacingOrder || menuLoading || Boolean(menuError) || bowls.length === 0 || Boolean(editingBowlId)}>
           {isPlacingOrder ? "Sending to the kitchen…" : "Place order"} <ArrowRight size={17}/>
         </button>
       </div>
