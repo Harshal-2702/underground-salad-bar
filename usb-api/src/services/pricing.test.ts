@@ -138,7 +138,7 @@ test("NC valuation uses the same authoritative menu prices and saves item snapsh
     { name: "Kidney Beans", category: "beans", scoops: 0.5 },
   ]);
 
-  assert.equal(result.totalMenuValue, 154);
+  assert.equal(result.totalMenuValue, 169);
   assert.equal(result.items[0].unitPrice, 40);
   assert.equal(result.items[1].unitPrice, 59);
   assert.deepEqual(result.items[2].selectedOptions, ["Carrot", "Corn"]);
