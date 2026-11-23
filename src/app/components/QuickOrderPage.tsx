@@ -77,6 +77,8 @@ function QuickOrderField({
 
 export function QuickOrderPage() {
   const [form, setForm] = useState<CustomerForm>(INITIAL_FORM);
+  const [categories, setCategories] = useState<readonly CategoryDefinition[]>(BOWL_CATEGORIES as readonly CategoryDefinition[]);
+  const [deliveryAreas, setDeliveryAreas] = useState(DELIVERY_AREAS);
   const [draftItems, setDraftItems] = useState<BowlItem[]>([]);
   const [selectedVeggies, setSelectedVeggies] = useState<string[]>([]);
   const [veggieScoops, setVeggieScoops] = useState(0);
@@ -87,7 +89,7 @@ export function QuickOrderPage() {
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
   const [placedOrder, setPlacedOrder] = useState<{ total: number; kotNumber?: string; invoiceNumber?: string } | null>(null);
   const [showAllSummary, setShowAllSummary] = useState(false);
-  const categories = BOWL_CATEGORIES as readonly CategoryDefinition[];
+
 
   useEffect(() => {
     const originalTitle = document.title;
@@ -105,7 +107,20 @@ export function QuickOrderPage() {
     };
   }, []);
 
-  const selectedArea = DELIVERY_AREAS.find((area) => area.name === form.area);
+  useEffect(() => {
+    let active = true;
+    fetch(API_URL + "/menu")
+      .then(async (response) => { if (!response.ok) throw new Error("Menu unavailable"); return response.json(); })
+      .then((catalogue) => {
+        if (!active) return;
+        if (Array.isArray(catalogue.categories) && catalogue.categories.length) setCategories(catalogue.categories);
+        if (Array.isArray(catalogue.deliveryAreas) && catalogue.deliveryAreas.length) setDeliveryAreas(catalogue.deliveryAreas);
+      })
+      .catch(() => { /* Keep bundled customer fallback if the API is temporarily unavailable. */ });
+    return () => { active = false; };
+  }, []);
+
+  const selectedArea = deliveryAreas.find((area) => area.name === form.area);
   const deliveryCharge = selectedArea?.deliveryCharge ?? 0;
   const bowlSubtotal = bowls.reduce((sum, bowl) => sum + bowl.total, 0);
   const estimatedTotal = bowlSubtotal + deliveryCharge;
@@ -364,7 +379,7 @@ export function QuickOrderPage() {
               <span>Delivery area *</span>
               <select value={form.area} onChange={(event) => updateForm("area", event.target.value)} aria-invalid={Boolean(errors.area)}>
                 <option value="">Choose your area</option>
-                {DELIVERY_AREAS.map((area) => <option key={area.name} value={area.name}>{area.name}</option>)}
+                {deliveryAreas.map((area) => <option key={area.name} value={area.name}>{area.name}</option>)}
               </select>
               {errors.area && <small className="qo-field-error">{errors.area}</small>}
             </label>
