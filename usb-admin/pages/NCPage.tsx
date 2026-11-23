@@ -97,7 +97,11 @@ export default function NCPage({
     let active = true;
     fetch(API_URL + "/menu")
       .then(async response => { if (!response.ok) throw new Error("Unable to load the live menu."); return response.json(); })
-      .then((data: MenuResponse) => { if (active) setMenu(Array.isArray(data.categories) ? data.categories : []); })
+      .then((data: MenuResponse) => {
+        if (!active) return;
+        if (Array.isArray(data.categories)) setMenu(data.categories);
+        if (Array.isArray(data.signatureBowls)) setSignatureBowls(data.signatureBowls);
+      })
       .catch(error => { if (active) setMenuError(error instanceof Error ? error.message : "Unable to load the live menu."); })
       .finally(() => { if (active) setMenuLoading(false); });
     return () => { active = false; };
