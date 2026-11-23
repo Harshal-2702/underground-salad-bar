@@ -3,7 +3,8 @@ import { API_URL } from "../src/config.ts";
 import "../src/nc.css";
 
 type MenuCategory = { id: string; name: string; subtitle: string; pricePerScoop: number; items: string[]; note?: string | null };
-type MenuResponse = { categories: MenuCategory[] };
+type SignatureBowl = { id: string; name: string; tagline: string; description: string; price: number; tag: string; tagColor: string; accentColor: string };
+type MenuResponse = { categories: MenuCategory[]; signatureBowls: SignatureBowl[] };
 type ConsumerType = "STAFF" | "OWNER" | "GUEST" | "VENDOR" | "PARTNER" | "OTHER";
 type Purpose = "STAFF_MEAL" | "MANAGEMENT" | "GUEST_COMPLIMENTARY" | "VENDOR_PARTNER" | "TASTING_QC" | "TRAINING" | "OTHER";
 type Mode = "PREPARE_NOW" | "ALREADY_CONSUMED";
@@ -60,6 +61,7 @@ export default function NCPage({
   accessToken, signedInEmail, onBackToOrders, onSignOut,
 }: { accessToken: string; signedInEmail: string; onBackToOrders: () => void; onSignOut: () => Promise<void> }) {
   const [menu, setMenu] = useState<MenuCategory[]>([]);
+  const [signatureBowls, setSignatureBowls] = useState<SignatureBowl[]>([]);
   const [menuLoading, setMenuLoading] = useState(true);
   const [menuError, setMenuError] = useState("");
   const [entries, setEntries] = useState<NcEntry[]>([]);
@@ -113,7 +115,8 @@ export default function NCPage({
 
   const estimate = useMemo(() => menuItems.reduce((total, item) => {
     const category = menu.find(x => x.id === item.category);
-    return total + (category?.pricePerScoop ?? 0) * item.scoops;
+    const signature = item.category === "signature" ? signatureBowls.find((bowl) => bowl.name === item.name) : undefined;
+    return total + (signature?.price ?? category?.pricePerScoop ?? 0) * item.scoops;
   }, 0), [menuItems, menu]);
 
   const changeItem = (category: MenuCategory, name: string, direction: 1 | -1) => {
@@ -150,6 +153,22 @@ export default function NCPage({
         : [...current, { name, category: category.id, scoops: 1 }];
       if (!existing) return current;
       return existing.scoops > 1 ? current.map(x => x === existing ? { ...x, scoops: x.scoops - 1 } : x) : current.filter(x => x !== existing);
+    });
+  };
+
+  const changeSignature = (name: string, direction: 1 | -1) => {
+    setFormError(""); setNotice("");
+    setSelectedItems((current) => {
+      const existing = current.find((item) => item.category === "signature" && item.name === name);
+      if (direction === 1) {
+        return existing
+          ? current.map((item) => item === existing ? { ...item, scoops: Math.min(20, item.scoops + 1) } : item)
+          : [...current, { name, category: "signature", scoops: 1 }];
+      }
+      if (!existing) return current;
+      return existing.scoops > 1
+        ? current.map((item) => item === existing ? { ...item, scoops: item.scoops - 1 } : item)
+        : current.filter((item) => item !== existing);
     });
   };
 
@@ -237,6 +256,19 @@ export default function NCPage({
         </div>
         {menuLoading ? <p className="nc-loading">Loading current customer menu…</p> : menu.length === 0 ? <p className="nc-inline-error">The shared menu is unavailable. No NC entry can be saved until it loads.</p> : (
           <div className="nc-menu-grid">
+            {signatureBowls.length > 0 && <section className="nc-category">
+              <div className="nc-category-title"><div><strong>Signature bowls</strong><small>Chef-curated menu favourites</small></div><b>Fixed menu price</b></div>
+              <div className="nc-items-grid">{signatureBowls.map((bowl) => {
+                const selected = selectedItems.find((item) => item.category === "signature" && item.name === bowl.name);
+                return <div className={"nc-menu-item " + (selected ? "is-selected" : "")} key={bowl.id}>
+                  <span>{bowl.name}<small className="nc-signature-tag">{bowl.tagline}</small></span>
+                  <div><small>{inr(bowl.price)}</small>{selected
+                    ? <div className="nc-qty-control"><button type="button" onClick={() => changeSignature(bowl.name,-1)}>−</button><b>{selected.scoops}</b><button type="button" onClick={() => changeSignature(bowl.name,1)}>+</button></div>
+                    : <button type="button" className="nc-add" onClick={() => changeSignature(bowl.name,1)}>+ Add</button>}
+                  </div>
+                </div>;
+              })}</div>
+            </section>}
             {menu.map(category => (
               <section className="nc-category" key={category.id}>
                 <div className="nc-category-title"><div><strong>{category.name}</strong><small>{category.subtitle}</small></div><b>{inr(category.pricePerScoop)} / scoop</b></div>
