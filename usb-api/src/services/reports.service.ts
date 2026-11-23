@@ -102,7 +102,7 @@ export async function getReportDashboard(filters: ReportFilters) {
     sheets: { some: { purchaseDate: { gte: range.dateStart, lt: range.dateEnd } } },
   };
 
-  const [ordersRaw, purchaseTransactionsRaw, latestStocktake, stocktakeHistory, timingSettings, totalOrderCount, orderStatusAggregates, channelStatusAggregates, orderTimingAggregates, ncEntriesRaw] = await Promise.all([
+  const [ordersRaw, purchaseTransactionsRaw, latestStocktake, stocktakeHistory, timingSettings, totalOrderCount, orderStatusAggregates, channelStatusAggregates, orderTimingAggregates, ncEntriesRaw, ncHeadlineAggregate, ncStatusAggregates, ncPurposeAggregates] = await Promise.all([
     prisma.order.findMany({
       where: orderWhere,
       orderBy: [{ createdAt: "desc" }, { kotSequence: "desc" }],
@@ -168,6 +168,22 @@ export async function getReportDashboard(filters: ReportFilters) {
       orderBy: [{ businessDate: "desc" }, { sequence: "desc" }],
       take: 5001,
       include: { items: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] } },
+    }),
+    prisma.nCConsumptionEntry.aggregate({
+      where: { businessDate: { gte: range.dateStart, lt: range.dateEnd }, status: { not: "VOIDED" } },
+      _count: { _all: true },
+      _sum: { menuValue: true },
+    }),
+    prisma.nCConsumptionEntry.groupBy({
+      by: ["status"],
+      where: { businessDate: { gte: range.dateStart, lt: range.dateEnd } },
+      _count: { _all: true },
+    }),
+    prisma.nCConsumptionEntry.groupBy({
+      by: ["purpose"],
+      where: { businessDate: { gte: range.dateStart, lt: range.dateEnd }, status: { not: "VOIDED" } },
+      _count: { _all: true },
+      _sum: { menuValue: true },
     }),
   ]);
 
@@ -427,7 +443,7 @@ export async function getReportDashboard(filters: ReportFilters) {
   const ncConsumerMap = new Map<string, { label: string; count: number; amount: number }>();
   const ncItemMap = new Map<string, { label: string; category: string; quantity: number; amount: number }>();
   const validNcEntries = ncEntries.filter((entry) => entry.status !== "VOIDED");
-  const ncMenuValue = validNcEntries.reduce((sum, entry) => sum + money(entry.menuValue), 0);
+  const ncMenuValue = money(ncHeadlineAggregate._sum.menuValue);
   for (const entry of validNcEntries) {
     addGroup(ncPurposeMap, entry.purpose, entry.purpose.replaceAll("_", " "), money(entry.menuValue));
     addGroup(ncConsumerMap, entry.consumerName.toLowerCase(), entry.consumerName, money(entry.menuValue));
@@ -519,14 +535,14 @@ export async function getReportDashboard(filters: ReportFilters) {
       history: stocktakeHistory,
     },
     nc: {
-      entryCount: validNcEntries.length,
+      entryCount: ncHeadlineAggregate._count._all,
       menuValue: ncMenuValue,
-      queuedCount: validNcEntries.filter((entry) => entry.status === "QUEUED").length,
-      preparingCount: validNcEntries.filter((entry) => entry.status === "PREPARING").length,
-      readyCount: validNcEntries.filter((entry) => entry.status === "READY").length,
-      completedCount: validNcEntries.filter((entry) => entry.status === "COMPLETED").length,
-      voidedCount: ncVoidedEntries.length,
-      byPurpose: sortedGroups(ncPurposeMap),
+      queuedCount: ncStatusAggregates.find((entry) => entry.status === "QUEUED")?._count._all ?? 0,
+      preparingCount: ncStatusAggregates.find((entry) => entry.status === "PREPARING")?._count._all ?? 0,
+      readyCount: ncStatusAggregates.find((entry) => entry.status === "READY")?._count._all ?? 0,
+      completedCount: ncStatusAggregates.find((entry) => entry.status === "COMPLETED")?._count._all ?? 0,
+      voidedCount: ncStatusAggregates.find((entry) => entry.status === "VOIDED")?._count._all ?? 0,
+      byPurpose: ncPurposeAggregates.map((entry) => ({ label: entry.purpose.replaceAll("_", " "), count: entry._count._all, amount: money(entry._sum.menuValue) })).sort((a, b) => b.amount - a.amount || b.count - a.count),
       byConsumer: sortedGroups(ncConsumerMap),
       byItem: [...ncItemMap.values()].sort((a, b) => b.amount - a.amount),
       entries: ncEntries.map((entry) => ({
