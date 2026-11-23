@@ -23,7 +23,7 @@ interface CartProps {
 }
 type CartView = 'cart' | 'checkout' | 'success';
 
-xport function Cart({
+export function Cart({
 
 isOpen,
 
