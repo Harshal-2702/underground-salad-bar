@@ -58,7 +58,7 @@ onBuildAnother,
   const [confirmedOrderTotal, setConfirmedOrderTotal] = useState<number | null>(null);
 
 // Find selected area's delivery charge
-const selectedArea = DELIVERY_AREAS.find(
+const selectedArea = deliveryAreas.find(
   area => area.name === form.area
 );
 
