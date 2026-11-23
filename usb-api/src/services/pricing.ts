@@ -60,6 +60,80 @@ export const DELIVERY_CHARGES: Readonly<Record<string, number>> = {
   Other: 60,
 };
 
+
+const MENU_CATEGORY_METADATA: Record<string, { name: string; subtitle: string; note: string | null }> = {
+  base: { name: "Base", subtitle: "Your foundation", note: null },
+  protein: { name: "Protein", subtitle: "Fresh-grilled daily", note: null },
+  veggies: { name: "Veggies", subtitle: "Pick as many as you like", note: "Unlimited variety per scoop" },
+  beans: { name: "Beans", subtitle: "Extra protein & fibre", note: null },
+  dressing: { name: "Dressing", subtitle: "The magic touch", note: null },
+};
+
+/** The single public menu source used by Customer ordering and staff NC entry. */
+export function getPublicMenuCatalog() {
+  return {
+    categories: Object.entries(INGREDIENT_PRICING).map(([id, category]) => ({
+      id,
+      ...(MENU_CATEGORY_METADATA[id] ?? { name: id, subtitle: "", note: null }),
+      pricePerScoop: category.pricePerScoop,
+      items: [...category.ingredients],
+    })),
+    deliveryAreas: Object.entries(DELIVERY_CHARGES).map(([name, deliveryCharge]) => ({
+      name,
+      deliveryCharge,
+    })),
+  };
+}
+
+export interface PricedNcMenuItem {
+  category: string;
+  categoryNameSnapshot: string;
+  itemName: string;
+  scoops: number;
+  unitPrice: number;
+  lineValue: number;
+  selectedOptions: string[] | null;
+}
+
+/** Validate NC selections with the exact same menu rules as customer checkout. */
+export function calculateNcMenuPricing(itemsInput: unknown): {
+  items: PricedNcMenuItem[];
+  totalMenuValue: number;
+} {
+  // Reuse the order's authoritative selection validator; NC remains a distinct record.
+  priceOneBowl({ items: itemsInput }, 0);
+  if (!Array.isArray(itemsInput)) {
+    throw new PricingValidationError("Select at least one menu item.");
+  }
+
+  const items = itemsInput.map((rawItem) => {
+    const item = rawItem as Record<string, unknown>;
+    const category = item.category as keyof typeof INGREDIENT_PRICING;
+    const pricing = INGREDIENT_PRICING[category];
+    const scoops = item.scoops as number;
+    const isVeggie = category === "veggies";
+    const itemName = isVeggie ? "Veggie Scoop" : item.name as string;
+    const selectedOptions = isVeggie ? [...(item.veggieSelection as string[])] : null;
+    const categoryNameSnapshot = MENU_CATEGORY_METADATA[category]?.name ?? category;
+    const lineValue = money(pricing.pricePerScoop * scoops);
+
+    return {
+      category,
+      categoryNameSnapshot,
+      itemName,
+      scoops,
+      unitPrice: pricing.pricePerScoop,
+      lineValue,
+      selectedOptions,
+    };
+  });
+
+  return {
+    items,
+    totalMenuValue: money(items.reduce((sum, item) => sum + item.lineValue, 0)),
+  };
+}
+
 const VEGGIE_NAMES = new Set<string>(INGREDIENT_PRICING.veggies.ingredients);
 const CATEGORY_NAMES = new Set(Object.keys(INGREDIENT_PRICING));
 
