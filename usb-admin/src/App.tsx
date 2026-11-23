@@ -4,6 +4,7 @@ import IngredientsPage from "./pages/IngredientsPage";
 import RecipesPage from "./pages/RecipesPage";
 import PurchasesPage from "./pages/PurchasesPage";
 import ReportsPage from "../pages/ReportsPage";
+import NCPage from "../pages/NCPage";
 import { AuthProvider, useAuth } from "./auth/AuthContext";
 import LoginPage from "./auth/LoginPage";
 import SetPasswordPage from "./auth/SetPasswordPage";
@@ -12,7 +13,7 @@ import "./auth/auth-extra.css";
 
 function AdminGate() {
   const { session, loading, passwordRecovery, signOut } = useAuth();
-  const [activeSection, setActiveSection] = useState<"orders" | "ingredients" | "recipes" | "purchases" | "reports">("orders");
+  const [activeSection, setActiveSection] = useState<"orders" | "ingredients" | "recipes" | "purchases" | "reports" | "nc">("orders");
 
   if (!isSupabaseConfigured) {
     return (
@@ -45,6 +46,17 @@ function AdminGate() {
   }
 
   if (!session) return <LoginPage />;
+
+  if (activeSection === "nc") {
+    return (
+      <NCPage
+        accessToken={session.access_token}
+        signedInEmail={session.user.email ?? "Staff"}
+        onBackToOrders={() => setActiveSection("orders")}
+        onSignOut={signOut}
+      />
+    );
+  }
 
   if (activeSection === "reports") {
     return (
@@ -98,6 +110,7 @@ function AdminGate() {
       onOpenRecipes={() => setActiveSection("recipes")}
       onOpenPurchases={() => setActiveSection("purchases")}
       onOpenReports={() => setActiveSection("reports")}
+      onOpenNC={() => setActiveSection("nc")}
     />
   );
 }
