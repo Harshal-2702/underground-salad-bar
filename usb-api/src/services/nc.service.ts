@@ -10,7 +10,7 @@ import { calculateNcMenuPricing } from "./pricing.js";
 import { getIndiaBusinessDate, isDateKey } from "./kot.service.js";
 
 export class NcError extends Error {
-  constructor(message: string, public readonly statusCode: 400 | 404 | 409 = 400) {
+  constructor(message: string, public readonly statusCode: 400 | 403 | 404 | 409 = 400) {
     super(message);
     this.name = "NcError";
   }
