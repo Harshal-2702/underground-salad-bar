@@ -162,7 +162,8 @@ const deleteIngredient = (bowlId: string, itemId: string) => {
     if (!form.lastName.trim()) e.lastName = 'Last name is required';
     if (!/^[6-9]\d{9}$/.test(form.phone)) e.phone = 'Enter a valid 10-digit phone number';
     if (!form.address.trim()) e.address = 'Address is required';
-    if (!form.area) e.area = 'Please select your area';
+    if (!form.area) e.area = deliveryAreasError || 'Please select your area';
+    if (deliveryAreasLoading || deliveryAreas.length === 0 || deliveryAreasError) e.area = deliveryAreasError || 'Delivery options are not ready. Please try again.';
     return e;
   };
 
@@ -553,17 +554,18 @@ setView("success");
                     <label className="font-['Sora'] text-sm font-semibold text-[#1F3D2B] block mb-1.5">Area *</label>
                     <select
                       value={form.area}
+                      disabled={deliveryAreasLoading || deliveryAreas.length === 0 || Boolean(deliveryAreasError)}
                       onChange={e => { setForm(f => ({ ...f, area: e.target.value })); setErrors(err => ({ ...err, area: '' })); }}
                       className={`w-full px-4 py-3 rounded-xl border font-['Sora'] text-sm bg-white outline-none transition-colors ${errors.area ? 'border-red-400' : 'border-[#1A1209]/15 focus:border-[#1F3D2B]'}`}
                     >
-                      <option value="">Select your area</option>
+                      <option value="">{deliveryAreasLoading ? "Loading delivery areas…" : "Select your area"}</option>
                      {deliveryAreas.map(area => (
                       <option key={area.name} value={area.name}>
                       {area.name}
                       </option>
                       ))}
                     </select>
-                    {errors.area && <p className="font-['Sora'] text-red-500 text-xs mt-1">{errors.area}</p>}
+                    {(errors.area || deliveryAreasError) && <p className="font-['Sora'] text-red-500 text-xs mt-1">{errors.area || deliveryAreasError}</p>}
                   </div>
 
                   {/* City — locked to Pune */}
