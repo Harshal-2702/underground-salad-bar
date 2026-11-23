@@ -127,6 +127,8 @@ test("the shared menu API exposes the same server-owned categories and scoop pri
   assert.equal(veggies?.pricePerScoop, 40);
   assert.ok(veggies?.items.includes("Broccoli"));
   assert.ok(catalogue.deliveryAreas.some((area) => area.name === "Camp" && area.deliveryCharge === 50));
+  assert.equal(catalogue.signatureBowls.find((bowl) => bowl.id === "continental")?.price, 289);
+  assert.ok(catalogue.signatureBowls.some((bowl) => bowl.name === "Burrito Bowl"));
 });
 
 test("NC valuation uses the same authoritative menu prices and saves item snapshots", () => {
