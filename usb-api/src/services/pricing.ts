@@ -105,6 +105,7 @@ const MENU_CATEGORY_METADATA: Record<string, { name: string; subtitle: string; n
 /** The single public menu source used by Customer ordering and staff NC entry. */
 export function getPublicMenuCatalog() {
   return {
+    signatureBowls: SIGNATURE_BOWLS.map((bowl) => ({ ...bowl })),
     categories: Object.entries(INGREDIENT_PRICING).map(([id, category]) => ({
       id,
       ...(MENU_CATEGORY_METADATA[id] ?? { name: id, subtitle: "", note: null }),
