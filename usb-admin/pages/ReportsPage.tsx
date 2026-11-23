@@ -4,19 +4,20 @@ import "../src/reports.css";
 
 type ReportChannel = "ALL" | "WEBSITE" | "ZOMATO" | "SWIGGY";
 type DatePreset = "TODAY" | "YESTERDAY" | "LAST_7" | "LAST_30" | "THIS_MONTH" | "CUSTOM";
-type ReportId = "overview" | "sales" | "kitchen" | "purchases" | "inventory" | "audit";
+type ReportId = "overview" | "sales" | "kitchen" | "purchases" | "inventory" | "audit" | "nc";
 type AnyRecord = Record<string, any>;
 
 type ReportDashboard = {
   filters: { from: string; to: string; channel: ReportChannel };
   generatedAt: string;
-  rowLimits: { ordersTruncated: boolean; purchasesTruncated: boolean; purchaseLinesTruncated?: boolean };
+  rowLimits: { ordersTruncated: boolean; purchasesTruncated: boolean; purchaseLinesTruncated?: boolean; ncEntriesTruncated?: boolean };
   overview: AnyRecord;
   sales: AnyRecord;
   kitchen: AnyRecord;
   purchases: AnyRecord;
   inventory: AnyRecord;
   audit: AnyRecord;
+  nc: AnyRecord;
 };
 
 type EmailPreference = {
@@ -34,6 +35,7 @@ const REPORT_OPTIONS: Array<{ id: ReportId; label: string }> = [
   { id: "purchases", label: "Purchases & expenses" },
   { id: "inventory", label: "Inventory & leftovers" },
   { id: "audit", label: "Business audit & exceptions" },
+  { id: "nc", label: "NC & internal consumption" },
 ];
 
 function indiaDateKey(date = new Date()): string {
@@ -355,16 +357,52 @@ function buildReportSheets(report: ReportDashboard): WorkbookSheet[] {
     ["Payment collection", "No payment settlement or collection record is currently available."],
     ["Profit / COGS", "Not calculated; order bowls are not linked to immutable recipe versions and actual ingredient issues."],
     ["Inventory changes", "Compares two stocktake snapshots; not a consumption or wastage calculation."],
+    ["NC menu value", "Historical customer menu value for internal consumption. NC is not customer sales, collected cash, food cost, or automatically calculated inventory consumption."],
+    ["NC menu snapshots", "NC entries preserve the selected menu item names and scoop prices at the time of entry, so later menu changes do not rewrite history."],
     ["Order high-volume safeguard", report.rowLimits.ordersTruncated ? "Order trend, hour and area breakdowns, SLA details and registers use the latest 5,000 order detail rows. Headline order totals, statuses and channel aggregates use full database counts/aggregates." : "No order detail row cap reached for this period."],
     ["Purchase high-volume safeguard", report.rowLimits.purchasesTruncated ? "Purchase spend/category/supplier/ingredient breakdowns use the latest 5,000 purchase transactions in this period." : "No purchase transaction row cap reached for this period."],
     ["Purchase line high-volume safeguard", report.rowLimits.purchaseLinesTruncated ? "Purchase line details are capped at the first 5,000 lines from the selected transaction sample." : "No purchase line row cap reached for this period."],
+    ["NC high-volume safeguard", report.rowLimits.ncEntriesTruncated ? "NC register detail is capped at the latest 5,000 entries; headline NC counts and values are calculated from the returned entry sample." : "No NC entry row cap reached for this period."],
     ["Time zone", "Asia/Kolkata (IST)."],
     ["Currency", "INR."],
+  ] });
+  sheets.push({ name: "NC Summary", rows: [
+    ["Metric", "Value", "Definition"],
+    ["NC entries", report.nc.entryCount, "Non-voided internal consumption entries in the selected period"],
+    ["Estimated menu value (INR)", report.nc.menuValue, "Historical customer menu value; not sales, collected cash, or food cost"],
+    ["Queued for kitchen", report.nc.queuedCount, "NC entries awaiting preparation"],
+    ["Preparing", report.nc.preparingCount, "NC preparation in progress"],
+    ["Ready", report.nc.readyCount, "NC preparation marked ready"],
+    ["Completed", report.nc.completedCount, "Prepared or already-consumed NC entries"],
+    ["Voided entries", report.nc.voidedCount, "Excluded from count and menu value"],
+    [],
+    ["Purpose", "Entries", "Estimated menu value (INR)"],
+    ...(report.nc.byPurpose ?? []).map((row: AnyRecord) => [row.label, row.count, row.amount]),
+    [],
+    ["Consumer", "Entries", "Estimated menu value (INR)"],
+    ...(report.nc.byConsumer ?? []).map((row: AnyRecord) => [row.label, row.count, row.amount]),
+    [],
+    ["Menu item", "Category", "Scoops", "Historical menu value (INR)"],
+    ...(report.nc.byItem ?? []).map((row: AnyRecord) => [row.label, row.category, row.quantity, row.amount]),
+  ] });
+  sheets.push({ name: "NC Register", rows: [
+    ["NC reference", "Date", "Time (IST)", "Purpose", "Mode", "Status", "Consumed by", "Person type", "Recorded by", "Estimated menu value (INR)", "Items", "Notes"],
+    ...(report.nc.entries ?? []).map((row: AnyRecord) => [
+      row.reference, formatDate(row.businessDate), formatDateTime(row.createdAt), row.purpose, row.mode, row.status,
+      row.consumerName, row.consumerType, row.recordedByEmail, row.menuValue,
+      (row.items ?? []).map((item: AnyRecord) => item.item + " × " + item.scoops + (item.selectedOptions?.length ? " (" + item.selectedOptions.join(", ") + ")" : "")).join("; "),
+      row.notes,
+    ]),
+  ] });
+  sheets.push({ name: "NC Void Audit", rows: [
+    ["NC reference", "Consumed by", "Historical menu value (INR)", "Voided at", "Voided by", "Reason"],
+    ...(report.audit.voidedNcEntries ?? []).map((row: AnyRecord) => [row.reference, row.consumerName, row.menuValue, formatDateTime(row.voidedAt), row.voidedByEmail, row.voidReason]),
   ] });
   sheets.push({ name: "Audit Log", rows: [
     ["Record type", "Reference", "Status / stage", "Channel / actor", "Amount (INR)", "Date", "Reason / note"],
     ...(report.audit.cancelledOrders ?? []).map((row: AnyRecord) => ["Cancelled order", row.kotNumber + " / " + row.invoiceNumber, "Cancelled", channelName(row.channel), row.total, formatDateTime(row.cancelledAt), "Order cancelled"]),
     ...(report.audit.voidedTransactions ?? []).map((row: AnyRecord) => ["Voided purchase", row.reference, "Voided", row.voidedByEmail, row.totalAmount, formatDateTime(row.voidedAt), row.voidReason]),
+    ...(report.audit.voidedNcEntries ?? []).map((row: AnyRecord) => ["Voided NC entry", row.reference, "Voided", row.voidedByEmail, row.menuValue, formatDateTime(row.voidedAt), row.voidReason]),
     ...(report.audit.activeLateOrders ?? []).map((row: AnyRecord) => ["Active kitchen alert", row.kotNumber, row.stage, channelName(row.channel), "", formatDateTime(row.createdAt), "Elapsed " + formatDuration(row.elapsedSeconds)]),
     ...(report.audit.completedOrdersMissingTiming ?? []).map((row: AnyRecord) => ["Missing timing", row.kotNumber, statusName(row.status), channelName(row.channel), "", formatDateTime(row.createdAt), "One or more operational timestamps are unavailable"]),
   ] });
@@ -579,7 +617,7 @@ export default function ReportsPage({
 
     <nav className="reports-section-nav" aria-label="Report sections">
       <a href="#overview">Overview</a><a href="#sales">Sales & orders</a><a href="#kitchen">Kitchen</a>
-      <a href="#purchases">Purchases</a><a href="#inventory">Inventory</a><a href="#audit">Audit</a><a href="#future">Future reports</a><a href="#email">Email report</a>
+      <a href="#purchases">Purchases</a><a href="#inventory">Inventory</a><a href="#audit">Audit</a><a href="#nc">NC consumption</a><a href="#future">Future reports</a><a href="#email">Email report</a>
     </nav>
 
     {error && <div className="reports-alert reports-alert-error" role="alert">{error}</div>}
@@ -587,11 +625,12 @@ export default function ReportsPage({
     {!loading && !report && <div className="reports-empty"><strong>No report data could be loaded.</strong><p>Check the connection and refresh the report.</p></div>}
 
     {report && <>
-      { (report.rowLimits.ordersTruncated || report.rowLimits.purchasesTruncated || report.rowLimits.purchaseLinesTruncated) &&
+      { (report.rowLimits.ordersTruncated || report.rowLimits.purchasesTruncated || report.rowLimits.purchaseLinesTruncated || report.rowLimits.ncEntriesTruncated) &&
         <div className="reports-alert reports-alert-warning">
           {report.rowLimits.ordersTruncated && <p>Order headline totals, channel and status totals use full-period database aggregates. Daily trends, busiest hours/days, areas, kitchen SLA distributions, timing breakdowns and order detail use the latest 5,000 order records.</p>}
           {report.rowLimits.purchasesTruncated && <p>Purchase summaries and transaction detail use the latest 5,000 purchase transactions with selected-period sheets.</p>}
           {report.rowLimits.purchaseLinesTruncated && <p>Purchase line-level detail is capped at 5,000 lines. Shorten the date range for a complete line export.</p>}
+          {report.rowLimits.ncEntriesTruncated && <p>NC register detail is capped at the latest 5,000 NC entries.</p>}
         </div>
       }
 
@@ -791,8 +830,47 @@ export default function ReportsPage({
       </section>
     </>}
 
+    <section id="nc" className="reports-section">
+      <div className="reports-section-title"><span>07</span><div><h2>NC & internal consumption</h2><p>No-charge food recorded for staff, management, guests, vendors and tastings. Kept separate from customer sales.</p></div></div>
+      <div className="reports-metric-grid reports-metric-grid-3">
+        <MetricCard label="NC entries" value={formatNumber(report?.nc?.entryCount ?? 0)} note="Voided entries excluded"/>
+        <MetricCard label="Estimated menu value" value={formatMoney(report?.nc?.menuValue ?? 0)} note="Historical customer menu value, not sales or food cost" tone="reports-metric-warm"/>
+        <MetricCard label="Voided entries" value={formatNumber(report?.nc?.voidedCount ?? 0)} note="Retained in audit history"/>
+      </div>
+      <div className="reports-metric-grid reports-metric-grid-3">
+        <MetricCard label="Queued for kitchen" value={formatNumber(report?.nc?.queuedCount ?? 0)} note="Prepare now"/>
+        <MetricCard label="Preparing / ready" value={formatNumber((report?.nc?.preparingCount ?? 0) + (report?.nc?.readyCount ?? 0))} note={(report?.nc?.preparingCount ?? 0) + " preparing · " + (report?.nc?.readyCount ?? 0) + " ready"}/>
+        <MetricCard label="Completed" value={formatNumber(report?.nc?.completedCount ?? 0)} note="Includes already-consumed entries"/>
+      </div>
+      <div className="reports-two-columns">
+        <Panel title="NC by purpose" subtitle="Entry count and historical menu value, excluding voided records."><BarList items={report?.nc?.byPurpose ?? []}/></Panel>
+        <Panel title="NC by person consuming" subtitle="Grouped by the name entered on the NC record."><BarList items={report?.nc?.byConsumer ?? []}/></Panel>
+      </div>
+      <Panel title="Most consumed menu items" subtitle="Quantities are recorded as menu scoop counts; this is not ingredient-weight consumption.">
+        <div className="reports-desktop-table"><div className="reports-table-scroll"><table><thead><tr><th>Item</th><th>Menu category</th><th>Scoops</th><th>Historical menu value</th></tr></thead><tbody>
+          {(report?.nc?.byItem ?? []).map((row: AnyRecord, index: number) => <tr key={row.label + index}><td>{row.label}</td><td>{row.category}</td><td>{formatNumber(row.quantity)}</td><td>{formatMoney(row.amount)}</td></tr>)}
+        </tbody></table></div></div>
+        <div className="reports-mobile-records">{(report?.nc?.byItem ?? []).slice(0,60).map((row: AnyRecord,index:number) => <article className="reports-record-card" key={row.label + index}>
+          <strong>{row.label}</strong><small>{row.category}</small><dl><div><dt>Scoops</dt><dd>{formatNumber(row.quantity)}</dd></div><div><dt>Menu value</dt><dd>{formatMoney(row.amount)}</dd></div></dl>
+        </article>)}</div>
+        {!report?.nc?.byItem?.length && <p className="reports-empty-inline">No NC item records in this period.</p>}
+      </Panel>
+      <Panel title="NC register" subtitle="Who consumed it, who recorded it, preparation mode, menu value and item snapshots.">
+        <div className="reports-desktop-table"><div className="reports-table-scroll"><table><thead><tr><th>NC reference</th><th>Time</th><th>Purpose</th><th>Consumed by</th><th>Status</th><th>Recorded by</th><th>Menu value</th><th>Items</th></tr></thead><tbody>
+          {(report?.nc?.entries ?? []).slice(0,100).map((row:AnyRecord) => <tr key={row.id}><td><strong>{row.reference}</strong></td><td>{formatDateTime(row.createdAt)}</td><td>{row.purpose}</td><td>{row.consumerName}<small>{row.consumerType}</small></td><td>{row.status}</td><td>{row.recordedByEmail}</td><td>{formatMoney(row.menuValue)}</td><td>{(row.items ?? []).map((item:AnyRecord) => item.item + " × " + item.scoops).join(", ")}</td></tr>)}
+        </tbody></table></div></div>
+        <div className="reports-mobile-records">{(report?.nc?.entries ?? []).slice(0,100).map((row:AnyRecord) => <article className="reports-record-card" key={row.id}>
+          <div><strong>{row.reference}</strong><span className={"reports-status-pill " + (row.status === "VOIDED" ? "is-cancelled" : "")}>{row.status}</span></div>
+          <small>{row.consumerName} · {row.purpose} · {formatDateTime(row.createdAt)}</small>
+          <dl><div><dt>Menu value</dt><dd>{formatMoney(row.menuValue)}</dd></div><div><dt>Recorded by</dt><dd>{row.recordedByEmail}</dd></div></dl>
+          <small>{(row.items ?? []).map((item:AnyRecord) => item.item + " × " + item.scoops).join(", ")}</small>
+        </article>)}</div>
+        <p className="reports-footnote">NC menu value is based on prices captured when the entry was created. It is not counted as revenue, collected money, or actual food cost. NC item scoops are not converted into ingredient stock deductions.</p>
+      </Panel>
+    </section>
+
     <section id="future" className="reports-section">
-      <div className="reports-section-title"><span>07</span><div><h2>Food cost & profitability</h2><p>Reserved for the next stage of structured operational data.</p></div></div>
+      <div className="reports-section-title"><span>08</span><div><h2>Food cost & profitability</h2><p>Reserved for the next stage of structured operational data.</p></div></div>
       <div className="reports-future-grid">
         {["Recipe and bowl costing","Food cost percentage","Cost of goods sold","Ingredient consumption","Actual wastage","Gross profit"].map((item) =>
           <div key={item}><span>Coming later</span><strong>{item}</strong></div>
@@ -802,7 +880,7 @@ export default function ReportsPage({
     </section>
 
     <section id="email" className="reports-section">
-      <div className="reports-section-title"><span>08</span><div><h2>Daily Excel email report</h2><p>Save your preferred recipient, delivery time and report selection for a future scheduled-email feature.</p></div></div>
+      <div className="reports-section-title"><span>09</span><div><h2>Daily Excel email report</h2><p>Save your preferred recipient, delivery time and report selection for a future scheduled-email feature.</p></div></div>
       <div className="reports-email-panel">
         <div className="reports-email-top"><div><strong>Daily email preferences</strong><p>These settings are saved for later. No email will be generated or sent.</p></div><span className="reports-disabled-pill">NOT ENABLED</span></div>
         {emailLoading ? <p className="reports-empty-inline">Loading saved email preferences…</p> : <div className="reports-email-layout">
