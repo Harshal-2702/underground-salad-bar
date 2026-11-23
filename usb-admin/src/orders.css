@@ -232,3 +232,6 @@
   .kot-section-row{grid-template-columns:15px 21px minmax(0,1fr) auto;gap:6px}
   .kot-section-actions .kot-icon-button{min-width:24px;padding:3px 5px}
 }
+
+.kot-nc-entry-button{background:#eef4eb;border-color:#cbdcc9;color:#244b32}
+.kot-nc-entry-button:not(:disabled):hover{background:#e2eedf;border-color:#a9c3a7}
