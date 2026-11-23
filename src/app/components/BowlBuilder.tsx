@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { API_URL } from "../config";
 import { Plus, Minus, X, Check, ChevronLeft, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -179,6 +180,18 @@ function RealisticBowlPreview({ selectedItems, selectedVeggies, veggieScoops }: 
 }
 
 export function BowlBuilder({ isOpen, onClose, onAddToCart }: BowlBuilderProps) {
+  const [menuCategories, setMenuCategories] = useState(BOWL_CATEGORIES);
+  const categories = menuCategories;
+  useEffect(() => {
+    let active = true;
+    fetch(API_URL + "/menu")
+      .then(async (response) => { if (!response.ok) throw new Error("Menu unavailable"); return response.json(); })
+      .then((catalogue) => {
+        if (active && Array.isArray(catalogue.categories) && catalogue.categories.length) setMenuCategories(catalogue.categories);
+      })
+      .catch(() => { /* Keep bundled menu fallback when API is temporarily unavailable. */ });
+    return () => { active = false; };
+  }, []);
   const [currentStep, setCurrentStep] = useState(0);
   const [selectedItems, setSelectedItems] = useState<BowlItem[]>([]);
   const [veggieScoops, setVeggieScoops] = useState(0);
@@ -411,7 +424,7 @@ const getCurrentSelection = () => {
       id: 'current-veggie-preview',
       name: 'Veggie Scoop',
       category: 'veggies',
-      price: categories[2].pricePerScoop,
+      price: menuCategories[2].pricePerScoop,
       scoops: veggieScoops,
       veggieSelection: selectedVeggies,
     });
@@ -525,7 +538,7 @@ const handleClose = () => {
 
         {/* Progress */}
         <div className="flex shrink-0 bg-[#1F3D2B]">
-          {categories.map((cat, i) => (
+          {menuCategories.map((cat, i) => (
             <div key={i} className="flex-1 h-1 transition-all" style={{
               backgroundColor: i < currentStep ? '#E98A15' : i === currentStep ? '#E2BD87' : 'rgba(255,255,255,0.1)'
             }} />
