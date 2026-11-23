@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { calculateOrderPricing, PricingValidationError } from "./pricing.js";
+import { calculateOrderPricing, calculateNcMenuPricing, getPublicMenuCatalog, PricingValidationError } from "./pricing.js";
 
 const bowl = (items: unknown[]) => [{ items }];
 
@@ -112,4 +112,46 @@ test("uses the configured delivery fee for every listed area", () => {
     assert.equal(calculateOrderPricing(bowl([{ name: "Rice", category: "base", scoops: 1 }]), area).deliveryCharge, 50);
   }
   assert.equal(calculateOrderPricing(bowl([{ name: "Rice", category: "base", scoops: 1 }]), "Other").deliveryCharge, 60);
+});
+
+test("the shared menu API exposes the same server-owned categories and scoop prices used by checkout", () => {
+  const catalogue = getPublicMenuCatalog();
+  const base = catalogue.categories.find((category) => category.id === "base");
+  const protein = catalogue.categories.find((category) => category.id === "protein");
+  const veggies = catalogue.categories.find((category) => category.id === "veggies");
+
+  assert.equal(base?.pricePerScoop, 40);
+  assert.ok(base?.items.includes("Rice"));
+  assert.equal(protein?.pricePerScoop, 59);
+  assert.ok(protein?.items.includes("Paneer"));
+  assert.equal(veggies?.pricePerScoop, 40);
+  assert.ok(veggies?.items.includes("Broccoli"));
+  assert.ok(catalogue.deliveryAreas.some((area) => area.name === "Camp" && area.deliveryCharge === 50));
+});
+
+test("NC valuation uses the same authoritative menu prices and saves item snapshots", () => {
+  const result = calculateNcMenuPricing([
+    { name: "Rice", category: "base", scoops: 1 },
+    { name: "Chicken", category: "protein", scoops: 1 },
+    { name: "Veggie Scoop", category: "veggies", scoops: 1, veggieSelection: ["Carrot", "Corn"] },
+    { name: "Chickpeas", category: "beans", scoops: 0.5 },
+    { name: "Kidney Beans", category: "beans", scoops: 0.5 },
+  ]);
+
+  assert.equal(result.totalMenuValue, 154);
+  assert.equal(result.items[0].unitPrice, 40);
+  assert.equal(result.items[1].unitPrice, 59);
+  assert.deepEqual(result.items[2].selectedOptions, ["Carrot", "Corn"]);
+  assert.equal(result.items[2].lineValue, 40);
+});
+
+test("NC valuation rejects unknown menu selections and invalid quantities", () => {
+  assert.throws(
+    () => calculateNcMenuPricing([{ name: "Truffle", category: "protein", scoops: 1 }]),
+    PricingValidationError,
+  );
+  assert.throws(
+    () => calculateNcMenuPricing([{ name: "Rice", category: "base", scoops: 0.5 }]),
+    PricingValidationError,
+  );
 });
