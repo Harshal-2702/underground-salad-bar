@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { X, Trash2, Plus, ArrowRight, CheckCircle2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Bowl, BowlItem } from "./BowlBuilder";
@@ -58,6 +58,17 @@ onBuildAnother,
 
 }: CartProps){
   const [view, setView] = useState<CartView>('cart');
+  const [deliveryAreas, setDeliveryAreas] = useState(DELIVERY_AREAS);
+  useEffect(() => {
+    let active = true;
+    fetch(API_URL + "/menu")
+      .then(async (response) => { if (!response.ok) throw new Error("Menu unavailable"); return response.json(); })
+      .then((catalogue) => {
+        if (active && Array.isArray(catalogue.deliveryAreas) && catalogue.deliveryAreas.length) setDeliveryAreas(catalogue.deliveryAreas);
+      })
+      .catch(() => { /* Keep bundled delivery areas if the API is temporarily unavailable. */ });
+    return () => { active = false; };
+  }, []);
   const [form, setForm] = useState({ firstName: '', lastName: '', phone: '', address: '', area: '', city: 'Pune' });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -560,7 +571,7 @@ setView("success");
                       className={`w-full px-4 py-3 rounded-xl border font-['Sora'] text-sm bg-white outline-none transition-colors ${errors.area ? 'border-red-400' : 'border-[#1A1209]/15 focus:border-[#1F3D2B]'}`}
                     >
                       <option value="">Select your area</option>
-                     {DELIVERY_AREAS.map(area => (
+                     {deliveryAreas.map(area => (
                       <option key={area.name} value={area.name}>
                       {area.name}
                       </option>
