@@ -133,11 +133,19 @@ export function calculateNcMenuPricing(itemsInput: unknown): {
   items: PricedNcMenuItem[];
   totalMenuValue: number;
 } {
-  // Reuse the order's authoritative selection validator; NC remains a distinct record.
-  priceOneBowl({ items: itemsInput }, 0);
-  if (!Array.isArray(itemsInput)) {
-    throw new PricingValidationError("Select at least one menu item.");
+  if (!Array.isArray(itemsInput) || itemsInput.length === 0 || itemsInput.length > 30) {
+    throw new PricingValidationError("Select between 1 and 30 NC menu items.");
   }
+  // Reuse the exact customer order validator. A signature bowl is a complete
+  // item and is validated separately so one NC entry can contain several bowls.
+  const regularItems = itemsInput.filter((rawItem) =>
+    !isRecord(rawItem) || rawItem.category !== "signature",
+  );
+  const signatureItems = itemsInput.filter((rawItem) =>
+    isRecord(rawItem) && rawItem.category === "signature",
+  );
+  if (regularItems.length > 0) priceOneBowl({ items: regularItems }, 0);
+  signatureItems.forEach((item, index) => priceOneBowl({ items: [item] }, index));
 
   const items = itemsInput.map((rawItem) => {
     const item = rawItem as Record<string, unknown>;
