@@ -35,8 +35,14 @@ export const getNcEntries = controller(async (req) => {
 export const postNcEntry = controller(async (req, res) => {
   const body: unknown = req.body;
   if (!body || typeof body !== "object" || Array.isArray(body)) throw new NcError("Request body must be a JSON object.");
+  const input = body as Record<string, unknown>;
   return createNcEntry({
-    ...(body as Record<string, unknown>),
+    consumerName: input.consumerName,
+    consumerType: input.consumerType,
+    purpose: input.purpose,
+    mode: input.mode,
+    notes: input.notes,
+    items: input.items,
     recordedByEmail: signedInEmail(res),
   });
 }, 201);
