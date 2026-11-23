@@ -40,14 +40,19 @@ onBuildAnother,
 }: CartProps){
   const [view, setView] = useState<CartView>('cart');
   const [deliveryAreas, setDeliveryAreas] = useState<Array<{name:string;deliveryCharge:number}>>([]);
+  const [deliveryAreasLoading, setDeliveryAreasLoading] = useState(true);
+  const [deliveryAreasError, setDeliveryAreasError] = useState("");
   useEffect(() => {
     let active = true;
     fetch(API_URL + "/menu")
       .then(async (response) => { if (!response.ok) throw new Error("Menu unavailable"); return response.json(); })
       .then((catalogue) => {
-        if (active && Array.isArray(catalogue.deliveryAreas) && catalogue.deliveryAreas.length) setDeliveryAreas(catalogue.deliveryAreas);
+        if (!active) return;
+        if (Array.isArray(catalogue.deliveryAreas) && catalogue.deliveryAreas.length) setDeliveryAreas(catalogue.deliveryAreas);
+        else setDeliveryAreasError("Delivery areas are unavailable. Please refresh before placing an order.");
       })
-      .catch(() => { /* The API remains the only source of current delivery areas. */ });
+      .catch((error) => { if (active) setDeliveryAreasError(error instanceof Error ? error.message : "Unable to load delivery areas."); })
+      .finally(() => { if (active) setDeliveryAreasLoading(false); });
     return () => { active = false; };
   }, []);
   const [form, setForm] = useState({ firstName: '', lastName: '', phone: '', address: '', area: '', city: 'Pune' });
