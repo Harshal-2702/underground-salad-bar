@@ -2,6 +2,7 @@ import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import orderRoutes from "./routes/order.routes.js";
+import menuRouter from "./routes/menu.routes.js";
 import {
   ingredientRouter,
   unitRouter,
@@ -84,6 +85,7 @@ app.get("/health", (_req, res) => {
 });
 
 // Public customer checkout; staff order endpoints require authentication.
+app.use("/menu", menuRouter);
 app.use("/orders", orderRoutes);
 
 // Staff-only ingredient catalogue APIs.
